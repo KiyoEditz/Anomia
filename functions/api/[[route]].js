@@ -220,7 +220,12 @@ const authRequired = async (c, next) => {
   const token = authHeader.slice(7);
   try {
     const payload = await verify(token, c.env.JWT_SECRET);
-    c.set('userId', payload.sub);
+    // FIX: Membaca .id atau .userId jika .sub bernilai kosong
+    const targetId = payload.sub || payload.id || payload.userId;
+    if (!targetId) {
+      return c.json({ error: 'Struktur payload token rusak' }, 401);
+    }
+    c.set('userId', targetId);
     await next();
   } catch (e) {
     return c.json({ error: 'Token tidak valid' }, 401);
@@ -233,7 +238,10 @@ const authOptional = async (c, next) => {
     const token = authHeader.slice(7);
     try {
       const payload = await verify(token, c.env.JWT_SECRET);
-      c.set('userId', payload.sub);
+      const targetId = payload.sub || payload.id || payload.userId;
+      if (targetId) {
+        c.set('userId', targetId);
+      }
     } catch (e) { }
   }
   await next();
