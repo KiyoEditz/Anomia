@@ -1,23 +1,23 @@
 {
-  "name": "anomia",
+  "name": "Anonimbuz",
   "version": "0.1.0",
-  "description": "Anomia - Social media REST API",
-  "main": "src/server.js",
+  "description": "Anonimbuz - Social media API (Hono + Prisma)",
+  "main": "functions/api/[[route]].js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "build": "npx prisma generate && npm install --prefix web && npm run build --prefix web",
+    "dev:backend": "wrangler pages dev --port 3000",
+    "prisma:push": "npx prisma db push",
+    "prisma:generate": "npx prisma generate"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
-    "cloudinary": "^2.5.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.5.1",
-    "multer": "^2.0.1"
+    "@neondatabase/serverless": "^0.9.4",
+    "@prisma/adapter-neon": "^5.16.1",
+    "@prisma/client": "^5.16.1",
+    "bcryptjs": "^2.4.3",
+    "hono": "^4.4.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "prisma": "^5.16.1",
+    "wrangler": "^3.60.1"
   }
 }

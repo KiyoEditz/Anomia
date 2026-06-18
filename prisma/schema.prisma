@@ -1,0 +1,67 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+model User {
+  id             String    @id @default(uuid())
+  username       String    @unique
+  passwordHash   String
+  displayName    String?
+  bio            String?   @default("")
+  avatarUrl      String?   @default("")
+  avatarPublicId String?   @default("")
+  bannerUrl      String?   @default("")
+  bannerPublicId String?   @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  posts          Post[]    @relation("UserPosts")
+  comments       Comment[] @relation("UserComments")
+  likedPosts     Post[]    @relation("UserLikes")
+  
+  // Self-relations for Follow System
+  followers      User[]    @relation("UserFollows")
+  following      User[]    @relation("UserFollows")
+}
+
+model Post {
+  id            String    @id @default(uuid())
+  content       String
+  embedUrl      String?   @default("")
+  isAnonymous   Boolean   @default(false)
+  anonymousName String?   @default("")
+  mood          String    @default("default")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  authorId      String
+  author        User      @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  comments      Comment[] @relation("PostComments")
+  likedBy       User[]    @relation("UserLikes")
+  tags          Tag[]     @relation("PostTags")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  postId    String
+  post      Post     @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Tag {
+  id         String   @id @default(uuid())
+  name       String
+  slug       String   @unique
+  category   String
+  usageCount Int      @default(0)
+  posts      Post[]   @relation("PostTags")
+  createdAt  DateTime @default(now())
+}

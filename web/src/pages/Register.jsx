@@ -27,7 +27,7 @@ export default function Register() {
 
   return (
     <form className="card form-card" onSubmit={submit}>
-      <h2>Daftar di Anomia</h2>
+      <h2>Daftar di Anonimbuz</h2>
       <div className="field">
         <label>Username (3-30, huruf/angka/_)</label>
         <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />

@@ -1,14 +1,13 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/post.controller');
 const commentCtrl = require('../controllers/comment.controller');
-const { authRequired } = require('../middleware/auth');
-const { uploadSingle } = require('../middleware/upload');
+const { authRequired, authOptional } = require('../middleware/auth');
 
-router.post('/', authRequired, uploadSingle('file'), ctrl.create);
-router.get('/', ctrl.list);
+router.post('/', authRequired, ctrl.create);
+router.get('/', authOptional, ctrl.list);
 router.get('/feed', authRequired, ctrl.feed);
-router.get('/user/:username', ctrl.listByUser);
-router.get('/:id', ctrl.detail);
+router.get('/user/:username', authOptional, ctrl.listByUser);
+router.get('/:id', authOptional, ctrl.detail);
 router.post('/:id/like', authRequired, ctrl.like);
 router.delete('/:id/like', authRequired, ctrl.unlike);
 router.delete('/:id', authRequired, ctrl.remove);

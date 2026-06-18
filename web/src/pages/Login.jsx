@@ -26,7 +26,7 @@ export default function Login() {
 
   return (
     <form className="card form-card" onSubmit={submit}>
-      <h2>Masuk ke Anomia</h2>
+      <h2>Masuk ke Anonimbuz</h2>
       <div className="field">
         <label>Username</label>
         <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />

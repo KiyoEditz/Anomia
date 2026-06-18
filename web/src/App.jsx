@@ -20,7 +20,7 @@ function Nav() {
   const navigate = useNavigate();
   return (
     <nav className="nav">
-      <Link to="/" className="brand">Anomia</Link>
+      <Link to="/" className="brand">Anonimbuz</Link>
       <Link to="/explore">Jelajah</Link>
       {user ? (
         <>

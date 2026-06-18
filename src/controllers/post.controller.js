@@ -37,9 +37,43 @@ async function buildTagFilter(req) {
   return filter;
 }
 
+const ANONYMOUS_PSEUDONYMS = [
+  'Pena Misterius',
+  'Siluet Malam',
+  'Penjelajah Sunyi',
+  'Gema Angin',
+  'Bayang Senja',
+  'Bisikan Malam',
+  'Pembaca Sandi',
+  'Pemikir Bebas',
+  'Arwah Digital',
+  'Kabut Pagi'
+];
+
+function anonymizePost(post, currentUserId) {
+  if (!post) return null;
+  const postObj = post.toObject ? post.toObject() : post;
+  
+  const authorId = postObj.author && (postObj.author._id || postObj.author);
+  const isMine = currentUserId ? String(authorId) === String(currentUserId) : false;
+  
+  if (postObj.isAnonymous) {
+    postObj.author = {
+      _id: 'anonim',
+      username: 'anonim',
+      displayName: postObj.anonymousName || 'Bisikan Misterius',
+      avatarUrl: '',
+      bio: 'Akun anonim di Anonimbuz.'
+    };
+  }
+  
+  postObj.isMine = isMine;
+  return postObj;
+}
+
 exports.create = async (req, res, next) => {
   try {
-    const { content } = req.body;
+    const { content, embedUrl, isAnonymous, mood } = req.body;
     let { tags } = req.body;
     if (typeof tags === 'string') {
       try { tags = JSON.parse(tags); } catch { tags = []; }
@@ -49,33 +83,24 @@ exports.create = async (req, res, next) => {
     }
     const tagDocs = Array.isArray(tags) ? await upsertTags(tags) : [];
 
-    let mediaUrl = '';
-    let mediaPublicId = '';
-    let mediaType = '';
-    if (req.file) {
-      const isVideo = req.file.mimetype.startsWith('video/');
-      mediaType = isVideo ? 'video' : 'image';
-      const result = await uploadBuffer(req.file.buffer, {
-        folder: 'anomia/posts',
-        resourceType: mediaType,
-      });
-      mediaUrl = result.secure_url;
-      mediaPublicId = result.public_id;
-    }
+    const anonName = isAnonymous
+      ? ANONYMOUS_PSEUDONYMS[Math.floor(Math.random() * ANONYMOUS_PSEUDONYMS.length)]
+      : '';
 
     const post = await Post.create({
       author: req.userId,
       content,
       tags: tagDocs.map((t) => t._id),
-      mediaUrl,
-      mediaPublicId,
-      mediaType,
+      embedUrl: embedUrl || '',
+      isAnonymous: !!isAnonymous,
+      anonymousName: anonName,
+      mood: mood || 'default',
     });
     await bumpTagUsage(tagDocs.map((t) => t._id), 1);
     const populated = await Post.findById(post._id)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category');
-    res.status(201).json({ post: populated });
+    res.status(201).json({ post: anonymizePost(populated, req.userId) });
   } catch (e) {
     next(e);
   }
@@ -94,7 +119,9 @@ exports.list = async (req, res, next) => {
       .limit(limit)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category');
-    res.json({ posts, page });
+    
+    const anonymized = posts.map((p) => anonymizePost(p, req.userId));
+    res.json({ posts: anonymized, page });
   } catch (e) {
     next(e);
   }
@@ -112,7 +139,9 @@ exports.feed = async (req, res, next) => {
       .limit(50)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category');
-    res.json({ posts });
+    
+    const anonymized = posts.map((p) => anonymizePost(p, req.userId));
+    res.json({ posts: anonymized });
   } catch (e) {
     next(e);
   }
@@ -124,7 +153,7 @@ exports.detail = async (req, res, next) => {
       .populate('author', 'username displayName bio avatarUrl')
       .populate('tags', 'name slug category');
     if (!post) return res.status(404).json({ error: 'Post tidak ditemukan' });
-    res.json({ post });
+    res.json({ post: anonymizePost(post, req.userId) });
   } catch (e) {
     next(e);
   }
@@ -134,12 +163,20 @@ exports.listByUser = async (req, res, next) => {
   try {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
-    const posts = await Post.find({ author: user._id })
+    
+    const query = { author: user._id };
+    if (String(user._id) !== String(req.userId)) {
+      query.isAnonymous = false;
+    }
+
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .limit(50)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category');
-    res.json({ posts });
+    
+    const anonymized = posts.map((p) => anonymizePost(p, req.userId));
+    res.json({ posts: anonymized });
   } catch (e) {
     next(e);
   }

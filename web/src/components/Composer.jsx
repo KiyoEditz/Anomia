@@ -1,18 +1,26 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import api from '../api';
 
 const CATEGORIES = ['genre', 'character', 'artist', 'group', 'language', 'format'];
+const MOODS = [
+  { value: 'default', label: 'Klasik' },
+  { value: 'cyberpunk', label: 'Cyberpunk' },
+  { value: 'neon', label: 'Neon Glow' },
+  { value: 'terminal', label: 'Terminal Retro' },
+  { value: 'sunset', label: 'Sunset Dream' },
+  { value: 'lavender', label: 'Lavender Calm' }
+];
 
 export default function Composer({ onCreated }) {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState([]);
   const [tagName, setTagName] = useState('');
   const [tagCategory, setTagCategory] = useState('genre');
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState('');
+  const [embedUrl, setEmbedUrl] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [mood, setMood] = useState('default');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const fileInputRef = useRef(null);
 
   function addTag() {
     const name = tagName.trim();
@@ -26,46 +34,24 @@ export default function Composer({ onCreated }) {
     setTags(tags.filter((_, idx) => idx !== i));
   }
 
-  function onFileChange(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 20 * 1024 * 1024) {
-      setErr('File maksimum 20MB');
-      e.target.value = '';
-      return;
-    }
-    setErr('');
-    setFile(f);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(URL.createObjectURL(f));
-  }
-
-  function clearFile() {
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(null);
-    setPreview('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
   async function submit(e) {
     e.preventDefault();
     if (!content.trim() || busy) return;
     setBusy(true);
     setErr('');
     try {
-      let r;
-      if (file) {
-        const fd = new FormData();
-        fd.append('content', content);
-        fd.append('tags', JSON.stringify(tags));
-        fd.append('file', file);
-        r = await api.post('/posts', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else {
-        r = await api.post('/posts', { content, tags });
-      }
+      const r = await api.post('/posts', {
+        content,
+        tags,
+        embedUrl,
+        isAnonymous,
+        mood
+      });
       setContent('');
       setTags([]);
-      clearFile();
+      setEmbedUrl('');
+      setIsAnonymous(false);
+      setMood('default');
       onCreated && onCreated(r.data.post);
     } catch (e) {
       setErr(e.response?.data?.error || 'Gagal mengirim');
@@ -74,28 +60,27 @@ export default function Composer({ onCreated }) {
     }
   }
 
-  const isVideo = file && file.type.startsWith('video/');
-
   return (
-    <form className="card" onSubmit={submit}>
+    <form className={`card composer-card mood-${mood}`} onSubmit={submit}>
       <div className="field">
         <textarea
-          placeholder="Apa yang sedang terjadi?"
+          placeholder="Apa yang ingin Anda bisikkan hari ini?"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          maxLength={500}
+          maxLength={1000}
         />
       </div>
-      {preview && (
-        <div className="media-preview">
-          {isVideo ? (
-            <video src={preview} controls />
-          ) : (
-            <img src={preview} alt="preview" />
-          )}
-          <button type="button" className="ghost" onClick={clearFile}>× Hapus media</button>
-        </div>
-      )}
+
+      <div className="composer-embed-row">
+        <span className="composer-row-icon">🔗</span>
+        <input
+          type="url"
+          placeholder="Embed URL (Youtube, Spotify, Gambar/Audio/Video langsung...)"
+          value={embedUrl}
+          onChange={(e) => setEmbedUrl(e.target.value)}
+        />
+      </div>
+
       <div className="composer-tag-row">
         <select value={tagCategory} onChange={(e) => setTagCategory(e.target.value)}>
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -108,6 +93,7 @@ export default function Composer({ onCreated }) {
         />
         <button type="button" className="ghost" onClick={addTag}>+ Tag</button>
       </div>
+
       {tags.length > 0 && (
         <div className="tags" style={{ marginTop: 8 }}>
           {tags.map((t, i) => (
@@ -117,20 +103,31 @@ export default function Composer({ onCreated }) {
           ))}
         </div>
       )}
-      <div className="post-actions">
-        <label className="ghost file-label">
-          📎 Media
+
+      <div className="composer-options-row">
+        <div className="composer-mood-selector">
+          <label>Tema: </label>
+          <select value={mood} onChange={(e) => setMood(e.target.value)}>
+            {MOODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </div>
+
+        <label className="whisper-toggle">
           <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            onChange={onFileChange}
-            style={{ display: 'none' }}
+            type="checkbox"
+            checked={isAnonymous}
+            onChange={(e) => setIsAnonymous(e.target.checked)}
           />
+          <span className="whisper-label-text">🤫 Whisper (Anonim)</span>
         </label>
-        <span className="muted">{content.length}/500</span>
+      </div>
+
+      <hr className="composer-divider" />
+
+      <div className="post-actions">
+        <span className="muted">{content.length}/1000</span>
         <button type="submit" disabled={!content.trim() || busy} style={{ marginLeft: 'auto' }}>
-          Kirim
+          {busy ? 'Mengirim...' : 'Kirim'}
         </button>
       </div>
       {err && <div className="error">{err}</div>}

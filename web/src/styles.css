@@ -216,3 +216,366 @@ textarea { resize: vertical; min-height: 80px; }
   color: #e7e9ea;
 }
 .file-label:hover { background: #1c2732; }
+
+/* --- Anonimbuz Text-Only & Premium Aesthetics --- */
+
+/* Composer Enhancements */
+.composer-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-width: 2px;
+}
+.composer-embed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #0f1419;
+  border: 1px solid #2f3336;
+  border-radius: 8px;
+  padding: 4px 12px;
+  margin-bottom: 12px;
+}
+.composer-row-icon {
+  font-size: 16px;
+  opacity: 0.8;
+}
+.composer-embed-row input {
+  background: transparent;
+  border: 0;
+  padding: 6px 0;
+  outline: none;
+}
+.composer-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.composer-mood-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.composer-mood-selector select {
+  width: auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.whisper-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+.whisper-toggle input {
+  width: auto;
+  cursor: pointer;
+}
+.composer-divider {
+  border: 0;
+  border-top: 1px solid #2f3336;
+  margin: 16px 0 12px;
+}
+
+/* Character Tiers & Text Formatting */
+.shout-text {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+  padding: 24px 12px;
+  white-space: pre-wrap;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #e0e0e0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.standard-text {
+  font-size: 16px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: #e7e9ea;
+}
+.reading-time-badge {
+  font-size: 12px;
+  color: #8b98a5;
+  background: #1c2732;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: auto;
+}
+.toggle-expand-btn {
+  border-color: rgba(83, 100, 113, 0.4);
+  background: transparent;
+  color: #1d9bf0;
+  cursor: pointer;
+}
+.toggle-expand-btn:hover {
+  background: rgba(29, 155, 240, 0.1);
+  border-color: #1d9bf0;
+}
+
+/* Card Mood Styles */
+.card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 1. Cyberpunk Mood */
+.mood-cyberpunk {
+  background: #000000 !important;
+  border: 2px solid #fcf113 !important;
+  box-shadow: 0 0 12px rgba(252, 241, 19, 0.15), inset 0 0 8px rgba(252, 241, 19, 0.05);
+  font-family: 'Courier New', Courier, monospace !important;
+}
+.mood-cyberpunk .shout-text {
+  background: linear-gradient(180deg, #fcf113 0%, #ff007f 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: 'Courier New', Courier, monospace;
+}
+.mood-cyberpunk input, .mood-cyberpunk textarea, .mood-cyberpunk select {
+  background: #111 !important;
+  border-color: #ff007f !important;
+  color: #fcf113 !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+.mood-cyberpunk button {
+  background: #ff007f !important;
+  color: #000 !important;
+  font-weight: 900;
+  border-radius: 0;
+  border: 1px solid #fcf113;
+}
+.mood-cyberpunk button.ghost {
+  background: transparent !important;
+  color: #ff007f !important;
+  border-color: #ff007f;
+}
+
+/* 2. Neon Glow Mood */
+.mood-neon {
+  background: linear-gradient(135deg, #0e0a16 0%, #150d22 100%) !important;
+  border: 2px solid #ff007f !important;
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.25);
+}
+.mood-neon .shout-text {
+  background: linear-gradient(180deg, #00f0ff 0%, #ff007f 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.mood-neon input, .mood-neon textarea, .mood-neon select {
+  background: #120a1c !important;
+  border-color: #00f0ff !important;
+  color: #fff !important;
+}
+.mood-neon button {
+  background: #00f0ff !important;
+  color: #120a1c !important;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+.mood-neon button.ghost {
+  background: transparent !important;
+  color: #00f0ff !important;
+  border-color: #00f0ff;
+}
+
+/* 3. Terminal Retro Mood */
+.mood-terminal {
+  background: #060907 !important;
+  border: 2px solid #33ff33 !important;
+  box-shadow: 0 0 10px rgba(51, 255, 51, 0.2);
+  font-family: 'Courier New', Courier, monospace !important;
+}
+.mood-terminal .shout-text {
+  background: none;
+  -webkit-text-fill-color: initial;
+  color: #33ff33 !important;
+  font-family: 'Courier New', Courier, monospace;
+  text-shadow: 0 0 6px rgba(51, 255, 51, 0.8);
+}
+.mood-terminal input, .mood-terminal textarea, .mood-terminal select {
+  background: #020503 !important;
+  border-color: #33ff33 !important;
+  color: #33ff33 !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+.mood-terminal button {
+  background: #33ff33 !important;
+  color: #000 !important;
+  border-radius: 4px;
+}
+.mood-terminal button.ghost {
+  background: transparent !important;
+  color: #33ff33 !important;
+  border-color: #33ff33;
+}
+
+/* 4. Sunset Dream Mood */
+.mood-sunset {
+  background: linear-gradient(135deg, #fc466b 0%, #3f5efb 100%) !important;
+  border: 2px solid #fc466b !important;
+  box-shadow: 0 0 15px rgba(252, 70, 107, 0.2);
+}
+.mood-sunset .shout-text {
+  background: linear-gradient(180deg, #ffffff 0%, #ffeef2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+.mood-sunset input, .mood-sunset textarea, .mood-sunset select {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: #fff !important;
+}
+.mood-sunset button {
+  background: #ffffff !important;
+  color: #3f5efb !important;
+}
+.mood-sunset button.ghost {
+  background: transparent !important;
+  color: #ffffff !important;
+  border-color: #ffffff;
+}
+
+/* 5. Lavender Calm Mood */
+.mood-lavender {
+  background: linear-gradient(135deg, #1c1a2c 0%, #26223e 100%) !important;
+  border: 2px solid #b1a6e2 !important;
+  box-shadow: 0 0 12px rgba(177, 166, 226, 0.15);
+}
+.mood-lavender .shout-text {
+  background: linear-gradient(180deg, #ffffff 0%, #d4cef2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.mood-lavender input, .mood-lavender textarea, .mood-lavender select {
+  background: #151322 !important;
+  border-color: #b1a6e2 !important;
+  color: #e2dff0 !important;
+}
+.mood-lavender button {
+  background: #b1a6e2 !important;
+  color: #1c1a2c !important;
+}
+.mood-lavender button.ghost {
+  background: transparent !important;
+  color: #b1a6e2 !important;
+  border-color: #b1a6e2;
+}
+
+/* Embed Layout Styles */
+.embed-container {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  margin: 12px 0;
+  border: 1px solid rgba(47, 51, 54, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.youtube-embed, .spotify-embed {
+  position: relative;
+  width: 100%;
+}
+.youtube-embed iframe {
+  width: 100%;
+  height: 340px;
+  display: block;
+  border: 0;
+}
+.spotify-embed iframe {
+  width: 100%;
+  display: block;
+  border: 0;
+}
+.image-embed img {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+.video-embed video {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+.audio-embed {
+  padding: 16px;
+  background: #15181c;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.audio-embed audio {
+  width: 100%;
+}
+.embed-link-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1c1f24;
+  border: 1px solid #2f3336;
+  border-radius: 12px;
+  color: #e7e9ea;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.embed-link-card:hover {
+  background: #252a32;
+  border-color: #536471;
+  text-decoration: none;
+}
+.embed-link-icon {
+  font-size: 24px;
+  opacity: 0.9;
+}
+.embed-link-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.embed-link-title {
+  font-weight: 600;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #1d9bf0;
+}
+.embed-link-domain {
+  font-size: 12px;
+  color: #8b98a5;
+  margin-top: 2px;
+}
+
+/* Whisper (Anonymous) Styling */
+.is-anonymous {
+  border-left: 4px solid #6d4aff !important;
+}
+.anonymous-avatar {
+  background: linear-gradient(135deg, #3a3f47 0%, #1e2229 100%) !important;
+  font-size: 16px;
+}
+.anonymous-badge {
+  font-size: 11px;
+  background: rgba(109, 74, 255, 0.2);
+  color: #b1a6e2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(109, 74, 255, 0.3);
+  font-weight: 600;
+  margin-left: 6px;
+}
+.meta-divider {
+  color: #536471;
+  margin: 0 4px;
+}
+.date-link:hover {
+  text-decoration: underline !important;
+}
