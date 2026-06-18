@@ -229,7 +229,7 @@ const authRequired = async (c, next) => {
   }
   const token = authHeader.slice(7);
   try {
-    const payload = await verify(token, c.env.JWT_SECRET);
+    const payload = await verify(token, c.env.JWT_SECRET, 'HS256');
     // FIX: Membaca .id atau .userId jika .sub bernilai kosong
     const targetId = payload.sub || payload.id || payload.userId;
     if (!targetId) {
@@ -247,7 +247,7 @@ const authOptional = async (c, next) => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     try {
-      const payload = await verify(token, c.env.JWT_SECRET);
+      const payload = await verify(token, c.env.JWT_SECRET, 'HS256');
       const targetId = payload.sub || payload.id || payload.userId;
       if (targetId) {
         c.set('userId', targetId);
@@ -261,7 +261,13 @@ const authOptional = async (c, next) => {
 
 // JWT Signing Helper
 async function signToken(userId, secret) {
-  return await sign({ sub: userId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret);
+  // Menegaskan algoritma penandatanganan HS256 secara eksplisit agar dikenali verify
+  const payload = {
+    sub: String(userId),
+    id: String(userId),
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
+  };
+  return await sign(payload, secret, 'HS256');
 }
 
 // Auth Routes
