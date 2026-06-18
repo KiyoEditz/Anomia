@@ -20,35 +20,29 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// FIX: Pindahkan instansiasi ke dalam Context Request agar I/O terisolasi dengan aman
+// Ganti blok middleware database Anda dengan ini:
 app.use('*', async (c, next) => {
   const databaseUrl = c.env.DATABASE_URL;
   if (!databaseUrl) {
-    return c.json({ error: "DATABASE_URL belum terdaftar di Environment Cloudflare!" }, 500);
+    return c.json({ error: "DATABASE_URL belum terdaftar di Cloudflare!" }, 500);
   }
-
-  // Membuat koneksi unik khusus untuk request yang sedang berjalan saat ini
   const pool = new Pool({ connectionString: databaseUrl });
   const adapter = new PrismaNeon(pool);
   const localPrisma = new PrismaClient({ adapter });
 
-  // Simpan ke dalam objek context Hono (c)
   c.set('prisma', localPrisma);
 
   try {
     await next();
   } finally {
-    // Opsional: Memastikan koneksi pool ditutup dengan bersih setelah request selesai
     c.executionCtx.waitUntil(pool.end());
   }
 });
 
 function getPrisma(ctx) {
-  // Jika parameter yang dikirim adalah objek context Hono yang memiliki fungsi .get
   if (ctx && typeof ctx.get === 'function') {
     return ctx.get('prisma');
   }
-  // Jika tidak, ambil dari context global aplikasi
   return app.context.prisma;
 }
 
@@ -482,8 +476,10 @@ app.delete('/users/:username/follow', authRequired, async (c) => {
 app.post('/posts', authRequired, async (c) => {
   const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
-  const { content, embedUrl, isAnonymous, mood } = await c.req.json();
-  let { tags } = await c.req.json().catch(() => ({}));
+  const bodyData = await c.req.json().catch(() => ({}));
+  const { content, embedUrl, isAnonymous, mood } = bodyData;
+  let { tags } = bodyData;
+
   if (typeof tags === 'string') {
     try { tags = JSON.parse(tags); } catch { tags = []; }
   }
