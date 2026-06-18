@@ -4,16 +4,15 @@
   "description": "Anonimbuz - Social media API (Hono + Prisma)",
   "main": "functions/api/[[route]].js",
   "scripts": {
-    "build": "npx prisma generate && npm install --prefix web && npm run build --prefix web",
+    "build": "npx prisma generate --no-engine && npm install --prefix web && npm run build --prefix web",
     "dev:backend": "wrangler pages dev --port 3000",
     "prisma:push": "npx prisma db push",
-    "prisma:generate": "npx prisma generate"
+    "prisma:generate": "npx prisma generate --no-engine"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.4",
     "@prisma/adapter-neon": "^5.16.1",
     "@prisma/client": "^5.16.1",
-    "bcryptjs": "^2.4.3",
     "hono": "^4.4.7"
   },
   "devDependencies": {
