@@ -2,17 +2,14 @@ import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-pages';
 import { cors } from 'hono/cors';
 import { sign, verify } from 'hono/jwt';
-// 1. TAMBAHKAN: neonConfig untuk mengaktifkan WebSocket di Edge Runtime
-import { Pool, neonConfig } from '@neondatabase/serverless';
+import { Pool } from '@neondatabase/serverless';
 import { PrismaNeon } from '@prisma/adapter-neon';
-import { PrismaClient } from '@prisma/client/edge';
+import { PrismaClient } from '@prisma/client';
 
 const app = new Hono().basePath('/api');
 
-// Global CORS Middleware
 app.use('*', cors());
 
-// Fungsi Hash Password bawaan Web Crypto API
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -21,20 +18,13 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Global Middleware untuk inisialisasi database
 let prismaGlobal;
 app.use('*', async (c, next) => {
   if (!prismaGlobal) {
     const databaseUrl = c.env.DATABASE_URL;
     if (!databaseUrl) {
-      return c.json({ error: "DATABASE_URL tidak ditemukan di Cloudflare!" }, 500);
+      return c.json({ error: "DATABASE_URL belum terdaftar di Environment Cloudflare!" }, 500);
     }
-
-    // 2. WAJIB: Setel konfigurasi WebSocket agar kompatibel dengan runtime Cloudflare
-    neonConfig.webSocketConstructor = async () => {
-      return new WebSocket(arguments[0], arguments[1]);
-    };
-
     const pool = new Pool({ connectionString: databaseUrl });
     const adapter = new PrismaNeon(pool);
     prismaGlobal = new PrismaClient({ adapter });
@@ -42,7 +32,6 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Mempertahankan fungsi lama
 function getPrisma() {
   return prismaGlobal;
 }
