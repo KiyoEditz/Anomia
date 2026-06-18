@@ -8,8 +8,10 @@ import { PrismaClient } from '@prisma/client';
 
 const app = new Hono().basePath('/api');
 
+// Global CORS Middleware
 app.use('*', cors());
 
+// Fungsi Hash Password bawaan Web Crypto API
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -18,22 +20,37 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-let prismaGlobal;
+// FIX: Pindahkan instansiasi ke dalam Context Request agar I/O terisolasi dengan aman
 app.use('*', async (c, next) => {
-  if (!prismaGlobal) {
-    const databaseUrl = c.env.DATABASE_URL;
-    if (!databaseUrl) {
-      return c.json({ error: "DATABASE_URL belum terdaftar di Environment Cloudflare!" }, 500);
-    }
-    const pool = new Pool({ connectionString: databaseUrl });
-    const adapter = new PrismaNeon(pool);
-    prismaGlobal = new PrismaClient({ adapter });
+  const databaseUrl = c.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return c.json({ error: "DATABASE_URL belum terdaftar di Environment Cloudflare!" }, 500);
   }
-  await next();
+
+  // Membuat koneksi unik khusus untuk request yang sedang berjalan saat ini
+  const pool = new Pool({ connectionString: databaseUrl });
+  const adapter = new PrismaNeon(pool);
+  const localPrisma = new PrismaClient({ adapter });
+
+  // Simpan ke dalam objek context Hono (c)
+  c.set('prisma', localPrisma);
+
+  try {
+    await next();
+  } finally {
+    // Opsional: Memastikan koneksi pool ditutup dengan bersih setelah request selesai
+    c.executionCtx.waitUntil(pool.end());
+  }
 });
 
-function getPrisma() {
-  return prismaGlobal;
+// Ganti fungsi getPrisma lama Anda dengan trik pendeteksi objek context ini:
+function getPrisma(ctx) {
+  // Jika parameter yang dikirim adalah objek context Hono yang memiliki fungsi .get
+  if (ctx && typeof ctx.get === 'function') {
+    return ctx.get('prisma');
+  }
+  // Jika tidak, ambil dari context global aplikasi
+  return app.context.prisma;
 }
 
 // Pseudonyms for Anonymous Whisper posts
@@ -256,7 +273,7 @@ async function signToken(userId, secret) {
 
 // Auth Routes
 app.post('/auth/register', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const { username, password, displayName } = await c.req.json();
   if (!username || !password) {
     return c.json({ error: 'username dan password wajib diisi' }, 400);
@@ -292,7 +309,7 @@ app.post('/auth/register', async (c) => {
 });
 
 app.post('/auth/login', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const { username, password } = await c.req.json();
   if (!username || !password) {
     return c.json({ error: 'username dan password wajib diisi' }, 400);
@@ -324,7 +341,7 @@ app.post('/auth/login', async (c) => {
 });
 
 app.get('/auth/me', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const user = await prismaInstance.user.findUnique({
     where: { id: userId },
@@ -338,7 +355,7 @@ app.get('/auth/me', authRequired, async (c) => {
 
 // User Routes
 app.get('/users/:username', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const user = await prismaInstance.user.findUnique({
     where: { username: c.req.param('username') },
     include: { followers: true, following: true }
@@ -350,7 +367,7 @@ app.get('/users/:username', async (c) => {
 });
 
 app.patch('/users/me', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const { displayName, bio } = await c.req.json();
   const update = {};
@@ -366,7 +383,7 @@ app.patch('/users/me', authRequired, async (c) => {
 });
 
 app.post('/users/me/avatar', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const body = await c.req.parseBody();
   const file = body['file'];
@@ -396,7 +413,7 @@ app.post('/users/me/avatar', authRequired, async (c) => {
 });
 
 app.post('/users/me/banner', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const body = await c.req.parseBody();
   const file = body['file'];
@@ -426,7 +443,7 @@ app.post('/users/me/banner', authRequired, async (c) => {
 });
 
 app.post('/users/:username/follow', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const target = await prismaInstance.user.findUnique({
     where: { username: c.req.param('username') }
@@ -446,7 +463,7 @@ app.post('/users/:username/follow', authRequired, async (c) => {
 });
 
 app.delete('/users/:username/follow', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const target = await prismaInstance.user.findUnique({
     where: { username: c.req.param('username') }
@@ -464,7 +481,7 @@ app.delete('/users/:username/follow', authRequired, async (c) => {
 
 // Post Routes
 app.post('/posts', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const { content, embedUrl, isAnonymous, mood } = await c.req.json();
   let { tags } = await c.req.json().catch(() => ({}));
@@ -546,7 +563,7 @@ function buildPrismaTagQuery(tagsCsv, excludeCsvParam, searchQ) {
 }
 
 app.get('/posts', authOptional, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const currentUserId = c.get('userId');
   const page = Math.max(1, parseInt(c.req.query('page')) || 1);
   const limit = 20;
@@ -575,7 +592,7 @@ app.get('/posts', authOptional, async (c) => {
 });
 
 app.get('/posts/feed', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
 
   const me = await prismaInstance.user.findUnique({
@@ -611,7 +628,7 @@ app.get('/posts/feed', authRequired, async (c) => {
 });
 
 app.get('/posts/user/:username', authOptional, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const currentUserId = c.get('userId');
   const user = await prismaInstance.user.findUnique({
     where: { username: c.req.param('username') }
@@ -640,7 +657,7 @@ app.get('/posts/user/:username', authOptional, async (c) => {
 });
 
 app.get('/posts/:id', authOptional, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const currentUserId = c.get('userId');
   const post = await prismaInstance.post.findUnique({
     where: { id: c.req.param('id') },
@@ -656,7 +673,7 @@ app.get('/posts/:id', authOptional, async (c) => {
 });
 
 app.post('/posts/:id/like', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const postId = c.req.param('id');
 
@@ -673,7 +690,7 @@ app.post('/posts/:id/like', authRequired, async (c) => {
 });
 
 app.delete('/posts/:id/like', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const postId = c.req.param('id');
 
@@ -690,7 +707,7 @@ app.delete('/posts/:id/like', authRequired, async (c) => {
 });
 
 app.delete('/posts/:id', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const postId = c.req.param('id');
 
@@ -721,7 +738,7 @@ app.delete('/posts/:id', authRequired, async (c) => {
 
 // Comment Routes
 app.get('/posts/:id/comments', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const comments = await prismaInstance.comment.findMany({
     where: { postId: c.req.param('id') },
     orderBy: { createdAt: 'asc' },
@@ -731,7 +748,7 @@ app.get('/posts/:id/comments', async (c) => {
 });
 
 app.post('/posts/:id/comments', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const postId = c.req.param('id');
   const { content } = await c.req.json();
@@ -756,7 +773,7 @@ app.post('/posts/:id/comments', authRequired, async (c) => {
 });
 
 app.delete('/posts/:id/comments/:commentId', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const userId = c.get('userId');
   const commentId = c.req.param('commentId');
 
@@ -779,7 +796,7 @@ app.get('/tags/categories', (c) => {
 });
 
 app.get('/tags', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const category = c.req.query('category');
   const search = c.req.query('search');
 
@@ -804,7 +821,7 @@ app.get('/tags', async (c) => {
 });
 
 app.get('/tags/popular', async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const tags = await prismaInstance.tag.findMany({
     where: { usageCount: { gt: 0 } },
     orderBy: { usageCount: 'desc' },
@@ -814,7 +831,7 @@ app.get('/tags/popular', async (c) => {
 });
 
 app.get('/tags/:slug', authOptional, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const currentUserId = c.get('userId');
   const slug = c.req.param('slug').toLowerCase();
   const page = Math.max(1, parseInt(c.req.query('page')) || 1);
@@ -851,7 +868,7 @@ app.get('/tags/:slug', authOptional, async (c) => {
 });
 
 app.post('/tags', authRequired, async (c) => {
-  const prismaInstance = getPrisma(c.env.DATABASE_URL);
+  const prismaInstance = getPrisma(c);
   const { name, category } = await c.req.json();
   if (!name || !category) {
     return c.json({ error: 'name dan category wajib diisi' }, 400);
