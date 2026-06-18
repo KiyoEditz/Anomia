@@ -7,7 +7,7 @@ const MOODS = [
   { value: 'cyberpunk', label: 'Cyberpunk' },
   { value: 'neon', label: 'Neon Glow' },
   { value: 'terminal', label: 'Terminal Retro' },
-  { value: 'sunset', label: 'Sunset Dream' },
+  { value: 'sunset', label: 'Sunset Dream (Rusaq)' },
   { value: 'lavender', label: 'Lavender Calm' }
 ];
 
@@ -75,7 +75,7 @@ export default function Composer({ onCreated }) {
         <span className="composer-row-icon">🔗</span>
         <input
           type="url"
-          placeholder="Embed URL (Youtube, Spotify, Gambar/Audio/Video langsung...)"
+          placeholder="Taroh URL (Youtube, Spotify, Gambar/Audio/Video, lainnya langsung disini... (auto embed) btw)"
           value={embedUrl}
           onChange={(e) => setEmbedUrl(e.target.value)}
         />
@@ -86,7 +86,7 @@ export default function Composer({ onCreated }) {
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <input
-          placeholder="Nama tag"
+          placeholder="Masukkan tag (Tanpa hastag)"
           value={tagName}
           onChange={(e) => setTagName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
