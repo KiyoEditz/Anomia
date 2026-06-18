@@ -43,7 +43,6 @@ app.use('*', async (c, next) => {
   }
 });
 
-// Ganti fungsi getPrisma lama Anda dengan trik pendeteksi objek context ini:
 function getPrisma(ctx) {
   // Jika parameter yang dikirim adalah objek context Hono yang memiliki fungsi .get
   if (ctx && typeof ctx.get === 'function') {
