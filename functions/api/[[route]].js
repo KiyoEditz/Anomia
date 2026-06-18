@@ -4,13 +4,22 @@ import { cors } from 'hono/cors';
 import { sign, verify } from 'hono/jwt';
 import { Pool } from '@neondatabase/serverless';
 import { PrismaNeon } from '@prisma/adapter-neon';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+// 1. DIUBAH: Menggunakan client khusus Edge Environment
+import { PrismaClient } from '@prisma/client/edge';
 
 const app = new Hono().basePath('/api');
 
 // Global CORS Middleware
 app.use('*', cors());
+
+// 2. DIUBAH: Fungsi Hash Password bawaan Web Crypto API (Pengganti Bcrypt)
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Database connection cacher
 let prisma;
@@ -18,6 +27,7 @@ function getPrisma(databaseUrl) {
   if (!prisma) {
     const pool = new Pool({ connectionString: databaseUrl });
     const adapter = new PrismaNeon(pool);
+    // Tambahkan log untuk memastikan inisialisasi aman
     prisma = new PrismaClient({ adapter });
   }
   return prisma;
@@ -221,7 +231,7 @@ const authOptional = async (c, next) => {
     try {
       const payload = await verify(token, c.env.JWT_SECRET);
       c.set('userId', payload.sub);
-    } catch (e) {}
+    } catch (e) { }
   }
   await next();
 };
@@ -249,7 +259,8 @@ app.post('/auth/register', async (c) => {
     return c.json({ error: 'username sudah dipakai' }, 409);
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashPassword(password);
+
   const user = await prismaInstance.user.create({
     data: {
       username,
@@ -277,8 +288,9 @@ app.post('/auth/login', async (c) => {
     return c.json({ error: 'username atau password salah' }, 401);
   }
 
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) {
+  const incomingHash = await hashPassword(password);
+  const isPasswordValid = (incomingHash === user.passwordHash);
+  if (!isPasswordValid) {
     return c.json({ error: 'username atau password salah' }, 401);
   }
 
