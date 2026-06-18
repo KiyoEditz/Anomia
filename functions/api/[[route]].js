@@ -280,7 +280,14 @@ app.post('/auth/register', async (c) => {
     }
   });
 
-  const token = await signToken(user.id, c.env.JWT_SECRET);
+  // FIX: Membuat token menggunakan fungsi 'sign' Hono asli dengan parameter lengkap
+  const jwtPayload = {
+    sub: user.id,
+    id: user.id,
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // Berlaku 7 hari
+  };
+  const token = await sign(jwtPayload, c.env.JWT_SECRET);
+
   return c.json({ token, user: userToPublicJSON(user) }, 201);
 });
 
@@ -305,7 +312,14 @@ app.post('/auth/login', async (c) => {
     return c.json({ error: 'username atau password salah' }, 401);
   }
 
-  const token = await signToken(user.id, c.env.JWT_SECRET);
+  // FIX: Sinkronisasi pembuatan token menggunakan format payload yang sama dengan Register
+  const jwtPayload = {
+    sub: user.id,
+    id: user.id,
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // Berlaku 7 hari
+  };
+  const token = await sign(jwtPayload, c.env.JWT_SECRET);
+
   return c.json({ token, user: userToPublicJSON(user) });
 });
 
