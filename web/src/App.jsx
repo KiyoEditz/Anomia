@@ -7,6 +7,7 @@ import Profile from './pages/Profile.jsx';
 import PostDetail from './pages/PostDetail.jsx';
 import TagPage from './pages/TagPage.jsx';
 import Explore from './pages/Explore.jsx';
+import Notifications from './pages/Notifications.jsx';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -16,7 +17,7 @@ function RequireAuth({ children }) {
 }
 
 function Nav() {
-  const { user, logout } = useAuth();
+  const { user, logout, unreadCount } = useAuth();
   const navigate = useNavigate();
   return (
     <nav className="nav">
@@ -24,6 +25,12 @@ function Nav() {
       <Link to="/explore">Jelajah</Link>
       {user ? (
         <>
+          <Link to="/notifications" className="nav-notifications">
+            Notifikasi
+            {unreadCount > 0 && (
+              <span className="nav-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+            )}
+          </Link>
           <Link to={`/u/${user.username}`}>@{user.username}</Link>
           <button onClick={() => { logout(); navigate('/login'); }}>Keluar</button>
         </>
@@ -50,6 +57,7 @@ export default function App() {
           <Route path="/u/:username" element={<Profile />} />
           <Route path="/p/:id" element={<PostDetail />} />
           <Route path="/tag/:slug" element={<TagPage />} />
+          <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
           <Route path="*" element={<div>404</div>} />
         </Routes>
       </main>

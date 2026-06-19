@@ -10,4 +10,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error.response &&
+      error.response.status === 403 &&
+      error.response.data &&
+      error.response.data.error &&
+      (error.response.data.error.includes('ditangguhkan') || error.response.data.error.includes('suspended'))
+    ) {
+      localStorage.removeItem('anomia_token');
+      window.location.href = `/login?error=${encodeURIComponent(error.response.data.error)}`;
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
