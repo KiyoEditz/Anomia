@@ -16,5 +16,7 @@ router.delete('/:id', authRequired, ctrl.remove);
 router.get('/:id/comments', commentCtrl.list);
 router.post('/:id/comments', authRequired, commentCtrl.create);
 router.delete('/:id/comments/:commentId', authRequired, commentCtrl.remove);
+router.post('/:id/comments/:commentId/like', authRequired, commentCtrl.like);
+router.delete('/:id/comments/:commentId/like', authRequired, commentCtrl.unlike);
 
 module.exports = router;

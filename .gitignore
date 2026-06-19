@@ -24,3 +24,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Temporary directories
+/temp/
+

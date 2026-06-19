@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema(
     bannerPublicId: { type: String, default: '' },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    strikeCount: { type: Number, default: 0 },
+    isSuspended: { type: Boolean, default: false },
+    suspendedAt: { type: Date, default: null },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
   },
   { timestamps: true }
 );

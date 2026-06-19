@@ -7,8 +7,13 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const postRoutes = require('./routes/post.routes');
 const tagRoutes = require('./routes/tag.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const webhookRoutes = require('./routes/webhook.routes');
 
 const app = express();
+const server = require('http').createServer(app);
+const { initSocket } = require('./utils/socket');
+initSocket(server);
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +26,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -34,5 +41,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 connectDB().then(() => {
-  app.listen(PORT, () => console.log(`Anomia running on http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`Anomia running on http://localhost:${PORT}`));
 });
