@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../auth.jsx';
 import PostCard from '../components/PostCard.jsx';
+import BadgeRole from '../components/BadgeRole.jsx';
 
 export default function Profile() {
   const { username } = useParams();
@@ -169,7 +170,10 @@ export default function Profile() {
               </form>
             ) : (
               <>
-                <h2>{profile.displayName || profile.username}</h2>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {profile.displayName || profile.username}
+                  <BadgeRole role={profile.role} />
+                </h2>
                 <div className="muted">@{profile.username}</div>
                 {profile.bio && <div className="bio">{profile.bio}</div>}
                 <div className="muted" style={{ marginTop: 8 }}>
@@ -187,6 +191,62 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {user && user.role === 'dev' && !isMe && (
+        <div className="card" style={{ border: '1px solid #ff6b35', background: 'rgba(255, 107, 53, 0.05)', marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 12px 0', color: '#ff6b35', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            🛠️ Developer Actions
+          </h4>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {profile.role === 'dev' ? (
+              <span className="muted">Developer lain tidak dapat dimodifikasi.</span>
+            ) : (
+              <>
+                <button 
+                  className="ghost"
+                  onClick={async () => {
+                    const newRole = profile.role === 'mod' ? 'user' : 'mod';
+                    if (!confirm(`Ubah role @${profile.username} menjadi ${newRole}?`)) return;
+                    try {
+                      await api.patch(`/users/${profile.id || profile._id}/role`, { role: newRole });
+                      alert('Role berhasil diubah!');
+                      load();
+                    } catch (err) {
+                      alert(err.response?.data?.error || 'Gagal mengubah role');
+                    }
+                  }}
+                >
+                  {profile.role === 'mod' ? '🛡️ Cabut Moderator' : '🛡️ Jadikan Moderator'}
+                </button>
+                {!profile.isSuspended ? (
+                  <button 
+                    className="danger"
+                    onClick={async () => {
+                      const reason = prompt('Masukkan alasan penangguhan akun:');
+                      if (reason === null) return;
+                      if (!reason.trim()) {
+                        alert('Alasan wajib diisi!');
+                        return;
+                      }
+                      try {
+                        await api.patch(`/users/${profile.id || profile._id}/suspend`, { reason });
+                        alert('Akun berhasil ditangguhkan!');
+                        load();
+                      } catch (err) {
+                        alert(err.response?.data?.error || 'Gagal menangguhkan akun');
+                      }
+                    }}
+                  >
+                    🚫 Suspend Akun
+                  </button>
+                ) : (
+                  <span className="error">⚠️ Akun Ditangguhkan</span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <h3>Post</h3>
       {posts.length === 0 ? (

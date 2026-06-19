@@ -133,13 +133,13 @@ detail teknis algoritma scanner (skor, kategori spesifik), cukup:
 
 ## 10. Implementation Checklist
 
-- [ ] Endpoint `POST /api/posts` menerima multipart upload
-- [ ] Modul quick scan (gambar langsung, video via frame sampling)
-- [ ] Integrasi upload ke Cloudinary setelah quick scan lolos
-- [ ] Setup Cloudinary moderation add-on / Rekognition Video job untuk thorough scan
-- [ ] Endpoint webhook `POST /api/webhooks/moderation`
-- [ ] Update status post + hapus media dari Cloudinary kalau thorough scan flagged
-- [ ] Notification service (in-app/email)
-- [ ] Strike counter & auto-suspend logic
-- [ ] Collection `moderation_logs` untuk audit trail
-- [ ] Fail-safe handling saat API moderasi down/timeout
+- [x] Endpoint `POST /api/posts` menerima multipart upload
+- [x] Modul quick scan (gambar langsung, video via frame sampling)
+- [x] Integrasi upload ke Cloudinary setelah quick scan lolos
+- [x] Setup Cloudinary moderation add-on / Rekognition Video job untuk thorough scan
+- [x] Endpoint webhook `POST /api/webhooks/moderation`
+- [x] Update status post + hapus media dari Cloudinary kalau thorough scan flagged
+- [x] Notification service (in-app/email)
+- [x] Strike counter & auto-suspend logic
+- [x] Collection `moderation_logs` untuk audit trail
+- [x] Fail-safe handling saat API moderasi down/timeout

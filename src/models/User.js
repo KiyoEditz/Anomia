@@ -23,7 +23,9 @@ const userSchema = new mongoose.Schema(
     strikeCount: { type: Number, default: 0 },
     isSuspended: { type: Boolean, default: false },
     suspendedAt: { type: Date, default: null },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['user', 'mod', 'dev'], default: 'user' },
+    roleAssignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    roleAssignedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -38,6 +40,7 @@ userSchema.methods.toPublicJSON = function () {
     bannerUrl: this.bannerUrl,
     followersCount: this.followers.length,
     followingCount: this.following.length,
+    role: this.role,
     createdAt: this.createdAt,
   };
 };

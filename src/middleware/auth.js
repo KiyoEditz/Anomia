@@ -24,8 +24,8 @@ async function authRequired(req, res, next) {
 }
 
 function adminRequired(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya admin yang diizinkan' });
+  if (!req.user || (req.user.role !== 'dev' && req.user.role !== 'admin')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Developer/Admin yang diizinkan' });
   }
   next();
 }

@@ -7,8 +7,10 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const postRoutes = require('./routes/post.routes');
 const tagRoutes = require('./routes/tag.routes');
+const commentRoutes = require('./routes/comment.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -26,8 +28,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -39,7 +43,11 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const { startCleanupJob } = require('./utils/cleanup');
 
 connectDB().then(() => {
-  server.listen(PORT, () => console.log(`Anomia running on http://localhost:${PORT}`));
+  server.listen(PORT, () => {
+    console.log(`Anomia running on http://localhost:${PORT}`);
+    startCleanupJob();
+  });
 });

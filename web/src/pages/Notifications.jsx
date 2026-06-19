@@ -20,7 +20,7 @@ function formatRelativeTime(dateStr) {
 }
 
 export default function Notifications() {
-  const { setUnreadCount } = useAuth();
+  const { setUnreadCount, socket } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +52,20 @@ export default function Notifications() {
   useEffect(() => {
     fetchNotifications(1, false);
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewNotification = (notif) => {
+      setNotifications((prev) => [notif, ...prev]);
+    };
+
+    socket.on('new_notification', handleNewNotification);
+
+    return () => {
+      socket.off('new_notification', handleNewNotification);
+    };
+  }, [socket]);
 
   async function handleMarkAllRead() {
     try {
@@ -134,11 +148,13 @@ export default function Notifications() {
               <div className="notification-icon-container">
                 {isModeration ? (
                   <span className="moderation-icon">⚠️</span>
+                ) : (n.type === 'system' || n.type === 'admin') ? (
+                  <div className="avatar-placeholder brand-notif">A</div>
                 ) : n.senderAvatar ? (
                   <img src={n.senderAvatar} alt="avatar" className="avatar" />
                 ) : (
                   <div className="avatar-placeholder">
-                    {n.senderUsername ? n.senderUsername[0].toUpperCase() : 'A'}
+                    {n.senderUsername ? n.senderUsername[0].toUpperCase() : 'U'}
                   </div>
                 )}
               </div>

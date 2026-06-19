@@ -3,6 +3,15 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../auth.jsx';
 import PostCard from '../components/PostCard.jsx';
+import BadgeRole from '../components/BadgeRole.jsx';
+
+function Avatar({ user, size = 32 }) {
+  const initial = (user.displayName || user.username || '?').charAt(0).toUpperCase();
+  if (user.avatarUrl) {
+    return <img className="avatar-img" src={user.avatarUrl} alt={user.username} style={{ width: size, height: size }} />;
+  }
+  return <div className="avatar-placeholder" style={{ width: size, height: size }}>{initial}</div>;
+}
 
 const CATEGORIES = ['genre', 'character', 'artist', 'group', 'language', 'format'];
 
@@ -23,6 +32,8 @@ export default function PostDetail() {
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [commentToDelete, setCommentToDelete] = useState(null);
+  const [commentReason, setCommentReason] = useState('');
 
   async function load() {
     setLoading(true);
@@ -57,6 +68,20 @@ export default function PostDetail() {
     if (!confirm('Hapus comment?')) return;
     await api.delete(`/posts/${id}/comments/${cid}`);
     setComments(comments.filter((c) => c._id !== cid));
+  }
+
+  async function moderateDeleteComment(cid) {
+    if (!commentReason.trim()) {
+      alert('Alasan wajib diisi!');
+      return;
+    }
+    try {
+      await api.delete(`/comments/${cid}/moderate`, { data: { reason: commentReason } });
+      setComments(comments.filter((c) => c._id !== cid));
+      setCommentToDelete(null);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Gagal menghapus komentar');
+    }
   }
 
   if (loading) return <div className="center">Memuat...</div>;
@@ -108,14 +133,36 @@ export default function PostDetail() {
         comments.map((c) => (
           <article key={c._id} className="card">
             <div className="post-meta">
-              <Link to={`/u/${c.author.username}`}><strong>{c.author.displayName || c.author.username}</strong></Link>
+              <Link to={`/u/${c.author.username}`} className="post-author">
+                <Avatar user={c.author} size={28} />
+                <strong>{c.author.displayName || c.author.username}</strong>
+                <BadgeRole role={c.author.role} />
+              </Link>
               <span>·</span>
               <span className="muted">{new Date(c.createdAt).toLocaleString()}</span>
             </div>
             <div className="post-content">{c.content}</div>
-            {user && String(c.author._id) === String(user.id) && (
-              <button className="danger" onClick={() => deleteComment(c._id)}>Hapus</button>
-            )}
+            <div style={{ marginTop: 8 }}>
+              {user && String(c.author._id) === String(user.id) ? (
+                <button className="danger" onClick={() => deleteComment(c._id)}>Hapus</button>
+              ) : (user && (user.role === 'mod' || user.role === 'dev') && (
+                commentToDelete === c._id ? (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: 8 }}>
+                    <input 
+                      type="text" 
+                      placeholder="Alasan hapus komentar..." 
+                      value={commentReason} 
+                      onChange={(e) => setCommentReason(e.target.value)} 
+                      style={{ fontSize: '13px', padding: '6px 10px', height: 'auto', flex: 1, minHeight: 'auto', margin: 0 }}
+                    />
+                    <button className="danger" onClick={() => moderateDeleteComment(c._id)} style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '4px' }}>Ya</button>
+                    <button className="ghost" onClick={() => setCommentToDelete(null)} style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '4px' }}>Batal</button>
+                  </div>
+                ) : (
+                  <button className="danger mod-action-btn" onClick={() => { setCommentToDelete(c._id); setCommentReason(''); }}>Hapus (Mod)</button>
+                )
+              ))}
+            </div>
           </article>
         ))
       )}

@@ -1,9 +1,13 @@
 const cloudinary = require('../config/cloudinary');
 
-function uploadBuffer(buffer, { folder, resourceType = 'auto' } = {}) {
+function uploadBuffer(buffer, { folder, resourceType = 'auto', moderation, notificationUrl, ...extraOptions } = {}) {
   return new Promise((resolve, reject) => {
+    const options = { folder, resource_type: resourceType, ...extraOptions };
+    if (moderation) options.moderation = moderation;
+    if (notificationUrl) options.notification_url = notificationUrl;
+
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: resourceType },
+      options,
       (err, result) => (err ? reject(err) : resolve(result))
     );
     stream.end(buffer);

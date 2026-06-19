@@ -265,18 +265,18 @@ Kalau ada → update dokumen itu, jangan buat dokumen baru.
 
 ## 9. Implementation Checklist
 
-- [ ] Buat collection `notifications` dengan index yang disarankan
-- [ ] Buat collection `broadcast_reads`
-- [ ] Fungsi helper `createNotification(data)` — semua trigger notifikasi pakai ini
-- [ ] Parser mention pada create-post dan create-comment
-- [ ] Trigger notifikasi pada: komentar baru, reply komentar, like post, like komentar, mention
-- [ ] Trigger notifikasi pada: moderasi removed, warning, suspended
-- [ ] Endpoint GET/PATCH/DELETE untuk notifikasi user
-- [ ] Endpoint POST admin (proteksi role admin)
-- [ ] Integrasi Socket.io untuk real-time delivery
-- [ ] Frontend: badge unread count (polling atau socket event)
-- [ ] Frontend: panel daftar notifikasi (paginasi infinite scroll)
-- [ ] Frontend: mark as read saat klik + navigasi deepLink
-- [ ] Frontend: tampilan khusus untuk notifikasi moderasi
-- [ ] Frontend: tampilan khusus notifikasi sistem/admin (ikon brand)
-- [ ] Cron job cleanup notifikasi lama
+- [x] Buat collection `notifications` dengan index yang disarankan
+- [x] Buat collection `broadcast_reads`
+- [x] Fungsi helper `createNotification(data)` — semua trigger notifikasi pakai ini
+- [x] Parser mention pada create-post dan create-comment
+- [x] Trigger notifikasi pada: komentar baru, reply komentar, like post, like komentar, mention
+- [x] Trigger notifikasi pada: moderasi removed, warning, suspended
+- [x] Endpoint GET/PATCH/DELETE untuk notifikasi user
+- [x] Endpoint POST admin (proteksi role admin)
+- [x] Integrasi Socket.io untuk real-time delivery
+- [x] Frontend: badge unread count (polling atau socket event)
+- [x] Frontend: panel daftar notifikasi (paginasi infinite scroll)
+- [x] Frontend: mark as read saat klik + navigasi deepLink
+- [x] Frontend: tampilan khusus untuk notifikasi moderasi
+- [x] Frontend: tampilan khusus notifikasi sistem/admin (ikon brand)
+- [x] Cron job cleanup notifikasi lama

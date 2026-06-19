@@ -7,7 +7,7 @@ exports.list = async (req, res, next) => {
   try {
     const comments = await Comment.find({ post: req.params.id })
       .sort({ createdAt: 1 })
-      .populate('author', 'username displayName');
+      .populate('author', 'username displayName avatarUrl role');
     res.json({ comments });
   } catch (e) {
     next(e);
@@ -84,7 +84,7 @@ exports.create = async (req, res, next) => {
       }
     }
 
-    const populated = await Comment.findById(comment._id).populate('author', 'username displayName');
+    const populated = await Comment.findById(comment._id).populate('author', 'username displayName avatarUrl role');
     res.status(201).json({ comment: populated });
   } catch (e) {
     next(e);
@@ -143,6 +143,47 @@ exports.unlike = async (req, res, next) => {
     if (!comment) return res.status(404).json({ error: 'Comment tidak ditemukan' });
 
     await Comment.updateOne({ _id: comment._id }, { $pull: { likes: req.userId } });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+const ManualModerationLog = require('../models/ManualModerationLog');
+
+exports.moderateRemove = async (req, res, next) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment tidak ditemukan' });
+
+    const reason = req.body.reason || 'Melanggar ketentuan komunitas.';
+
+    // Log the manual action
+    await ManualModerationLog.create({
+      action: 'delete_comment',
+      performedBy: req.userId,
+      performedByRole: req.user.role,
+      targetUserId: comment.author,
+      targetPostId: comment.post,
+      targetCommentId: comment._id,
+      reason,
+    });
+
+    // Delete comment
+    await comment.deleteOne();
+
+    // Decrement commentsCount
+    await Post.updateOne({ _id: comment.post }, { $inc: { commentsCount: -1 } });
+
+    // Notify comment author
+    await createNotification({
+      recipientId: comment.author,
+      senderId: req.userId,
+      type: 'moderation_removed',
+      message: `Komentar Anda telah dihapus oleh moderator. Alasan: ${reason}`,
+      refPostId: comment.post,
+    });
+
     res.json({ ok: true });
   } catch (e) {
     next(e);

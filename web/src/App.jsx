@@ -8,6 +8,7 @@ import PostDetail from './pages/PostDetail.jsx';
 import TagPage from './pages/TagPage.jsx';
 import Explore from './pages/Explore.jsx';
 import Notifications from './pages/Notifications.jsx';
+import AdminPanel from './pages/AdminPanel.jsx';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ function Nav() {
       <Link to="/explore">Jelajah</Link>
       {user ? (
         <>
+          {user.role === 'dev' && <Link to="/admin" style={{ color: '#ff6b35', fontWeight: 'bold' }}>Admin</Link>}
           <Link to="/notifications" className="nav-notifications">
             Notifikasi
             {unreadCount > 0 && (
@@ -58,6 +60,7 @@ export default function App() {
           <Route path="/p/:id" element={<PostDetail />} />
           <Route path="/tag/:slug" element={<TagPage />} />
           <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth><AdminPanel /></RequireAuth>} />
           <Route path="*" element={<div>404</div>} />
         </Routes>
       </main>

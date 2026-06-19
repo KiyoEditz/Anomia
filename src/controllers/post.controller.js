@@ -7,7 +7,7 @@ const { uploadBuffer, destroyAsset } = require('../utils/cloudinary');
 const { createNotification } = require('../utils/notification');
 const { quickScan } = require('../utils/moderation');
 
-const AUTHOR_FIELDS = 'username displayName avatarUrl';
+const AUTHOR_FIELDS = 'username displayName avatarUrl role';
 
 async function bumpTagUsage(tagIds, delta) {
   if (!tagIds || tagIds.length === 0) return;
@@ -53,7 +53,13 @@ exports.create = async (req, res, next) => {
     // Run Quick Scan on media file if it exists
     let scanResult = null;
     if (req.file) {
-      scanResult = await quickScan(req.file.buffer, req.file.mimetype, content, req.userId);
+      try {
+        scanResult = await quickScan(req.file.buffer, req.file.mimetype, content, req.userId);
+      } catch (err) {
+        console.error('[Moderation Error]:', err);
+        return res.status(400).json({ error: 'Konten tidak dapat dipublikasikan karena terjadi kesalahan pada sistem moderasi.' });
+      }
+
       if (!scanResult.isApproved) {
         return res.status(400).json({ error: 'Konten tidak dapat dipublikasikan karena melanggar ketentuan atau terjadi kesalahan.' });
       }
@@ -67,10 +73,19 @@ exports.create = async (req, res, next) => {
     if (req.file) {
       const isVideo = req.file.mimetype.startsWith('video/');
       mediaType = isVideo ? 'video' : 'image';
-      const result = await uploadBuffer(req.file.buffer, {
+      
+      const uploadOptions = {
         folder: 'anomia/posts',
         resourceType: mediaType,
-      });
+      };
+
+      const webhookUrl = process.env.MODERATION_WEBHOOK_URL;
+      if (webhookUrl) {
+        uploadOptions.notificationUrl = webhookUrl;
+        uploadOptions.moderation = isVideo ? 'google_video_moderation' : 'aws_rek';
+      }
+
+      const result = await uploadBuffer(req.file.buffer, uploadOptions);
       mediaUrl = result.secure_url;
       mediaPublicId = result.public_id;
     }
@@ -92,6 +107,38 @@ exports.create = async (req, res, next) => {
     });
 
     await bumpTagUsage(tagDocs.map((t) => t._id), 1);
+
+    // Thorough scan simulation logic (local development / testing)
+    if (req.file && !process.env.MODERATION_WEBHOOK_URL) {
+      const isFlagged = content.toLowerCase().includes('test-thorough-flagged');
+      const mockWebhookData = {
+        public_id: mediaPublicId,
+        status: isFlagged ? 'flagged' : 'approved',
+        provider: 'mock-thorough-scan',
+        score: isFlagged ? 95 : 0,
+        reason: isFlagged ? 'Simulated thorough scan violation' : '',
+      };
+
+      setTimeout(async () => {
+        try {
+          console.log(`[Simulation] Triggering thorough scan webhook for post: ${post._id}`);
+          const webhookCtrl = require('./webhook.controller');
+          const mockReq = { body: mockWebhookData };
+          const mockRes = {
+            json: (data) => console.log('[Simulation Webhook Response]:', data),
+            status: function (code) {
+              console.log('[Simulation Webhook Status]:', code);
+              return this;
+            },
+          };
+          await webhookCtrl.moderation(mockReq, mockRes, (err) => {
+            if (err) console.error('[Simulation Webhook Error]:', err);
+          });
+        } catch (err) {
+          console.error('[Simulation Webhook Execution Error]:', err);
+        }
+      }, 5000);
+    }
 
     // Parse mentions and trigger notifications
     const mentions = [...new Set(content.match(/@([a-zA-Z0-9_]+)/g) || [])]
@@ -171,9 +218,9 @@ exports.feed = async (req, res, next) => {
 exports.detail = async (req, res, next) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'username displayName bio avatarUrl')
+      .populate('author', 'username displayName bio avatarUrl role')
       .populate('tags', 'name slug category');
-    if (!post || post.status === 'removed') return res.status(404).json({ error: 'Post tidak ditemukan' });
+    if (!post || post.status !== 'published') return res.status(404).json({ error: 'Post tidak ditemukan' });
     res.json({ post });
   } catch (e) {
     next(e);
@@ -246,6 +293,64 @@ exports.remove = async (req, res, next) => {
     await post.deleteOne();
     await bumpTagUsage(tagIds, -1);
     if (mediaPublicId) destroyAsset(mediaPublicId, mediaType || 'image');
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+const ManualModerationLog = require('../models/ManualModerationLog');
+
+exports.moderateRemove = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post tidak ditemukan' });
+
+    const reason = req.body.reason || 'Melanggar ketentuan komunitas.';
+    const tagIds = [...(post.tags || [])];
+    const mediaPublicId = post.mediaPublicId;
+    const mediaType = post.mediaType;
+
+    // Delete comments
+    await Comment.deleteMany({ post: post._id });
+    
+    // Set status to removed_by_mod
+    post.status = 'removed_by_mod';
+    post.removedReason = reason;
+    await post.save();
+
+    // Bump tag usage
+    await bumpTagUsage(tagIds, -1);
+
+    // Destroy asset
+    if (mediaPublicId) {
+      try {
+        destroyAsset(mediaPublicId, mediaType || 'image');
+      } catch (err) {
+        console.error('Failed to destroy asset:', err);
+      }
+    }
+
+    // Log the manual action
+    await ManualModerationLog.create({
+      action: 'delete_post',
+      performedBy: req.userId,
+      performedByRole: req.user.role,
+      targetUserId: post.author,
+      targetPostId: post._id,
+      reason,
+    });
+
+    // Notify post author
+    await createNotification({
+      recipientId: post.author,
+      senderId: req.userId,
+      type: 'moderation_removed',
+      message: `Postingan Anda telah dihapus oleh moderator. Alasan: ${reason}`,
+      refPostId: post._id,
+      refMediaPreview: post.mediaUrl,
+    });
+
     res.json({ ok: true });
   } catch (e) {
     next(e);

@@ -397,3 +397,54 @@ textarea { resize: vertical; min-height: 80px; }
   background: #1c2732;
 }
 
+.avatar-placeholder.brand-notif {
+  background: linear-gradient(135deg, #6d4aff, #ff4a8a);
+  font-weight: 800;
+  border: 2px solid #6d4aff;
+  box-shadow: 0 0 8px rgba(109, 74, 255, 0.4);
+}
+
+/* Badge Role Styling - Glassmorphism, Premium colors & glow */
+.badge-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.badge-role.dev {
+  background: rgba(255, 107, 53, 0.12);
+  color: #ff6b35;
+  border: 1px solid rgba(255, 107, 53, 0.35);
+  text-shadow: 0 0 4px rgba(255, 107, 53, 0.2);
+}
+
+.badge-role.mod {
+  background: rgba(74, 144, 226, 0.12);
+  color: #4a90e2;
+  border: 1px solid rgba(74, 144, 226, 0.35);
+  text-shadow: 0 0 4px rgba(74, 144, 226, 0.2);
+}
+
+.badge-icon {
+  font-size: 12px;
+}
+
+/* Mod control actions */
+.mod-action-btn {
+  background: rgba(244, 33, 46, 0.1);
+  color: #f4212e;
+  border: 1px solid rgba(244, 33, 46, 0.3);
+}
+.mod-action-btn:hover {
+  background: #f4212e;
+  color: #fff;
+}
+

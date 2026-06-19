@@ -10,7 +10,7 @@ const postSchema = new mongoose.Schema(
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Tag', index: true }],
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     commentsCount: { type: Number, default: 0 },
-    status: { type: String, enum: ['published', 'removed'], default: 'published', index: true },
+    status: { type: String, enum: ['published', 'removed', 'removed_by_mod'], default: 'published', index: true },
     quickScan: {
       provider: { type: String, default: '' },
       result: { type: String, default: '' },

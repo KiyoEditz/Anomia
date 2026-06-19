@@ -63,7 +63,12 @@ async function uploadProfileMedia(req, res, next, { field, folder }) {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
-    const result = await uploadBuffer(req.file.buffer, { folder, resourceType: 'image' });
+    const uploadOptions = { folder, resourceType: 'image' };
+    if (req.file.mimetype === 'image/gif') {
+      uploadOptions.format = 'webp';
+    }
+
+    const result = await uploadBuffer(req.file.buffer, uploadOptions);
     const oldPublicId = user[`${field}PublicId`];
 
     user[`${field}Url`] = result.secure_url;
@@ -83,3 +88,122 @@ exports.uploadAvatar = (req, res, next) =>
 
 exports.uploadBanner = (req, res, next) =>
   uploadProfileMedia(req, res, next, { field: 'banner', folder: 'anomia/banners' });
+
+const ManualModerationLog = require('../models/ManualModerationLog');
+const { createNotification } = require('../utils/notification');
+
+// PATCH /api/users/:userId/role (Developer only)
+exports.assignRole = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+
+    if (!role || !['user', 'mod'].includes(role)) {
+      return res.status(400).json({ error: 'Role harus mod atau user' });
+    }
+
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User tidak ditemukan' });
+    }
+
+    if (targetUser.role === 'dev') {
+      return res.status(403).json({ error: 'Role Developer tidak bisa diubah.' });
+    }
+
+    targetUser.role = role;
+    targetUser.roleAssignedBy = req.userId;
+    targetUser.roleAssignedAt = new Date();
+    await targetUser.save();
+
+    // Log the manual moderation action
+    await ManualModerationLog.create({
+      action: 'assign_role',
+      performedBy: req.userId,
+      performedByRole: req.user.role,
+      targetUserId: targetUser._id,
+      reason: `Mengubah role ke ${role}`,
+    });
+
+    res.json({
+      message: 'Role berhasil diperbarui.',
+      user: {
+        id: targetUser._id,
+        username: targetUser.username,
+        role: targetUser.role,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/users/moderators (Developer only)
+exports.listModerators = async (req, res, next) => {
+  try {
+    const moderators = await User.find({ role: { $in: ['mod', 'dev'] } })
+      .populate('roleAssignedBy', 'username displayName');
+    
+    res.json({ moderators });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// PATCH /api/users/:userId/suspend (Developer only)
+exports.suspendUser = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Alasan penangguhan wajib diisi' });
+    }
+
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User tidak ditemukan' });
+    }
+
+    if (targetUser.role === 'dev') {
+      return res.status(403).json({ error: 'Tidak dapat menangguhkan Developer.' });
+    }
+
+    targetUser.isSuspended = true;
+    targetUser.suspendedAt = new Date();
+    await targetUser.save();
+
+    // Log action
+    await ManualModerationLog.create({
+      action: 'suspend_user',
+      performedBy: req.userId,
+      performedByRole: req.user.role,
+      targetUserId: targetUser._id,
+      reason,
+    });
+
+    // Notify user
+    await createNotification({
+      recipientId: targetUser._id,
+      senderId: null,
+      type: 'moderation_suspended',
+      message: `Akun Anda ditangguhkan secara manual oleh Developer. Alasan: ${reason}`,
+    });
+
+    res.json({ message: 'Akun user berhasil ditangguhkan.' });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/users/moderation-logs (dev + mod only)
+exports.listModerationLogs = async (req, res, next) => {
+  try {
+    const logs = await ManualModerationLog.find()
+      .sort({ createdAt: -1 })
+      .populate('performedBy', 'username displayName')
+      .populate('targetUserId', 'username displayName')
+      .populate('targetPostId')
+      .populate('targetCommentId');
+    res.json({ logs });
+  } catch (e) {
+    next(e);
+  }
+};
