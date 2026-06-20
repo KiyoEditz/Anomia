@@ -16,6 +16,15 @@ exports.register = async (req, res, next) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'username dan password wajib diisi' });
     }
+    if (username.length < 3 || username.length > 30) {
+      return res.status(400).json({ error: 'Username harus 3-30 karakter.' });
+    }
+    if (!/^[a-zA-Z0-9_]([a-zA-Z0-9_.]*[a-zA-Z0-9_])?$/.test(username)) {
+      return res.status(400).json({ error: 'Username hanya boleh mengandung huruf, angka, underscore (_), dan titik (.). Tidak boleh diawali/diakhiri titik.' });
+    }
+    if (/\.{2,}/.test(username)) {
+      return res.status(400).json({ error: 'Username tidak boleh mengandung titik berturut-turut.' });
+    }
     if (password.length < 6) {
       return res.status(400).json({ error: 'password minimal 6 karakter' });
     }

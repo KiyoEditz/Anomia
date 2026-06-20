@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: 3,
       maxlength: 30,
-      match: /^[a-zA-Z0-9_]+$/,
+      match: /^[a-zA-Z0-9_]([a-zA-Z0-9_.]*[a-zA-Z0-9_])?$/,
     },
     passwordHash: { type: String, required: true },
     displayName: { type: String, trim: true, maxlength: 50 },

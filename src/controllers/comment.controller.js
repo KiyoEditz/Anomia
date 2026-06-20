@@ -65,7 +65,7 @@ exports.create = async (req, res, next) => {
     }
 
     // 2. Trigger Mentions
-    const mentions = [...new Set(content.match(/@([a-zA-Z0-9_]+)/g) || [])]
+    const mentions = [...new Set(content.match(/@([a-zA-Z0-9_.]+)/g) || [])]
       .map((m) => m.slice(1))
       .filter((uname) => uname.toLowerCase() !== req.user.username.toLowerCase());
 

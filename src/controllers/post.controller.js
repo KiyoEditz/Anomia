@@ -149,7 +149,7 @@ exports.create = async (req, res, next) => {
     }
 
     // Parse mentions and trigger notifications
-    const mentions = [...new Set(content.match(/@([a-zA-Z0-9_]+)/g) || [])]
+    const mentions = [...new Set(content.match(/@([a-zA-Z0-9_.]+)/g) || [])]
       .map((m) => m.slice(1))
       .filter((uname) => uname.toLowerCase() !== req.user.username.toLowerCase());
 
