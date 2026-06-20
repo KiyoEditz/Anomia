@@ -88,6 +88,8 @@ export default function Explore() {
       console.error(e);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   }
 
@@ -135,9 +137,9 @@ export default function Explore() {
         {popularTags.length > 0 && !query && (
           <div className="explore-trending-tags">
             {popularTags.map((t) => (
-              <Link 
-                key={t._id || t.id} 
-                to={`/tag/${t.slug}`} 
+              <Link
+                key={t._id || t.id}
+                to={`/tag/${t.slug}`}
                 className={`tag ${t.category}`}
                 style={{ whiteSpace: 'nowrap' }}
               >
@@ -150,19 +152,19 @@ export default function Explore() {
 
       {/* Filter Chips */}
       <div className="explore-filter-chips">
-        <button 
+        <button
           className={`filter-chip ${activeChip === 'trending' ? 'active' : ''}`}
           onClick={() => handleChipChange('trending')}
         >
           Trending
         </button>
-        <button 
+        <button
           className={`filter-chip ${activeChip === 'accounts' ? 'active' : ''}`}
           onClick={() => handleChipChange('accounts')}
         >
           Akun
         </button>
-        <button 
+        <button
           className={`filter-chip ${activeChip === 'tags' ? 'active' : ''}`}
           onClick={() => handleChipChange('tags')}
         >
