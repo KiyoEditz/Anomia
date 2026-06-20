@@ -19,7 +19,7 @@ const { globalLimiter } = require('./middleware/ipRateLimiter');
 
 const app = express();
 
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 const server = require('http').createServer(app);
 const { initSocket } = require('./utils/socket');

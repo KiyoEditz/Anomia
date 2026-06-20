@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { getRealIp } = require('../utils/realIp');
 
 // --- Brute Force Login ---
 // Maks 8 percobaan login GAGAL per IP per hari.
@@ -8,8 +9,9 @@ const loginLimiter = rateLimit({
   skipSuccessfulRequests: true, // Login berhasil tidak menghabiskan kuota
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => getRealIp(req),
   handler: (req, res) => {
-    console.warn(`[Security] Brute force terdeteksi dari IP: ${req.ip}`);
+    console.warn(`[Security] Brute force terdeteksi dari IP: ${getRealIp(req)}`);
     return res.status(429).json({
       error: 'Terlalu banyak percobaan login. Coba lagi besok.',
       retryAfter: '24 jam',
@@ -25,8 +27,9 @@ const registerLimiter = rateLimit({
   skipSuccessfulRequests: false, // Registrasi berhasil pun dihitung
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => getRealIp(req),
   handler: (req, res) => {
-    console.warn(`[Security] Registrasi massal dari IP: ${req.ip}`);
+    console.warn(`[Security] Registrasi massal dari IP: ${getRealIp(req)}`);
     return res.status(429).json({
       error: 'Terlalu banyak akun dibuat dari jaringan ini. Coba lagi dalam 1 jam.',
     });
