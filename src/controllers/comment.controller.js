@@ -2,6 +2,7 @@ const Comment = require('../models/Comment');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const { createNotification } = require('../utils/notification');
+const { sanitizePostContent } = require('../utils/sanitize');
 
 exports.list = async (req, res, next) => {
   try {
@@ -185,6 +186,28 @@ exports.moderateRemove = async (req, res, next) => {
     });
 
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/comments/user/:username
+exports.listByUser = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ username: req.params.username });
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+    const comments = await Comment.find({ author: user._id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate('author', 'username displayName avatarUrl role')
+      .populate({
+        path: 'post',
+        select: 'content author status',
+        populate: { path: 'author', select: 'username displayName avatarUrl role' }
+      });
+
+    res.json({ comments });
   } catch (e) {
     next(e);
   }

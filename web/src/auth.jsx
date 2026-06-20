@@ -19,13 +19,23 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    const token = localStorage.getItem('anomia_token');
     const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     const socketConn = io(socketUrl, {
-      query: { userId: user.id || user._id },
+      auth: { token },
+      withCredentials: true,
     });
 
     socketConn.on('connect', () => {
       console.log('Connected to real-time notification socket');
+    });
+
+    socketConn.on('connect_error', (err) => {
+      if (err.message && err.message.includes('SOCKET_UNAUTHORIZED')) {
+        // Token expired / tidak valid — bersihkan sesi & arahkan ke login.
+        localStorage.removeItem('anomia_token');
+        window.location.href = '/login';
+      }
     });
 
     socketConn.on('new_notification', (notif) => {

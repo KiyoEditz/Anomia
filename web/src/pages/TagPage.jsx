@@ -27,19 +27,24 @@ export default function TagPage() {
 
   return (
     <div>
-      <div className="card">
-        <div className={`tag ${tag.category}`} style={{ fontSize: 18, padding: '6px 14px' }}>
-          {tag.name}
-        </div>
-        <div className="muted" style={{ marginTop: 8 }}>
-          Kategori: {tag.category} · Digunakan {tag.usageCount}x
+      <div className="tag-page-header">
+        <span className={`tag ${tag.category}`} style={{ fontSize: 16, padding: '6px 16px' }}>
+          #{tag.name}
+        </span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{tag.name}</div>
+          <div className="tag-page-count">
+            Kategori: {tag.category} · {tag.usageCount} postingan
+          </div>
         </div>
       </div>
-      <h3>Post dengan tag ini</h3>
+
       {posts.length === 0 ? (
-        <div className="center muted">Belum ada post.</div>
+        <div className="center muted" style={{ padding: 32 }}>Belum ada post dengan tag ini.</div>
       ) : (
-        posts.map((p) => <PostCard key={p._id} post={p} />)
+        <div className="feed-list">
+          {posts.map((p) => <PostCard key={p._id} post={p} />)}
+        </div>
       )}
     </div>
   );

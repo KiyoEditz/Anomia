@@ -5,6 +5,8 @@ const User = require('../models/User');
 function signToken(userId) {
   return jwt.sign({ sub: userId.toString() }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    algorithm: 'HS256',
+    issuer: 'anomia', // Harus cocok dengan verifikasi di middleware/auth.js
   });
 }
 

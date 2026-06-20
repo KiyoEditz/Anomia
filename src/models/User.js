@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['user', 'mod', 'dev'], default: 'user' },
     roleAssignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     roleAssignedAt: { type: Date, default: null },
+    bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
   },
   { timestamps: true }
 );
@@ -40,6 +41,8 @@ userSchema.methods.toPublicJSON = function () {
     bannerUrl: this.bannerUrl,
     followersCount: this.followers.length,
     followingCount: this.following.length,
+    followers: this.followers,
+    following: this.following,
     role: this.role,
     createdAt: this.createdAt,
   };

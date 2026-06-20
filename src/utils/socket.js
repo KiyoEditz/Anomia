@@ -1,4 +1,6 @@
 const { Server } = require('socket.io');
+const socketAuth = require('../middleware/socketAuth');
+const { ALLOWED_ORIGINS } = require('../config/cors');
 
 let io = null;
 const userSockets = new Map(); // userId string -> Set of socketIds
@@ -6,34 +8,28 @@ const userSockets = new Map(); // userId string -> Set of socketIds
 function initSocket(server) {
   io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: ALLOWED_ORIGINS,
+      credentials: true,
       methods: ['GET', 'POST'],
     },
   });
 
+  // Pasang middleware auth SEBELUM handler apapun — hanya koneksi terverifikasi
+  // yang boleh lanjut. userId tidak lagi dipercaya dari query/payload client.
+  io.use(socketAuth);
+
   io.on('connection', (socket) => {
-    const userId = socket.handshake.query.userId || socket.handshake.auth?.userId;
+    // Identitas diambil dari socket.user yang sudah diverifikasi DB di middleware.
+    const userId = socket.user._id;
 
-    if (userId) {
-      socket.join(`user_${userId}`);
-      if (!userSockets.has(userId)) {
-        userSockets.set(userId, new Set());
-      }
-      userSockets.get(userId).add(socket.id);
-      console.log(`User connected via socket: ${userId} (socket.id: ${socket.id})`);
+    socket.join(`user_${userId}`);
+    if (!userSockets.has(userId)) {
+      userSockets.set(userId, new Set());
     }
-
-    socket.on('register', (data) => {
-      const regUserId = data?.userId;
-      if (regUserId) {
-        socket.join(`user_${regUserId}`);
-        if (!userSockets.has(regUserId)) {
-          userSockets.set(regUserId, new Set());
-        }
-        userSockets.get(regUserId).add(socket.id);
-        console.log(`User registered socket event: ${regUserId} (socket.id: ${socket.id})`);
-      }
-    });
+    userSockets.get(userId).add(socket.id);
+    console.log(
+      `[Socket] ${socket.user.username} (${socket.user.role}) terhubung (socket.id: ${socket.id})`
+    );
 
     socket.on('disconnect', () => {
       // Find and remove from map

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import api from '../api';
+import { IconNotification, IconShield, IconTrash } from '../components/Icons.jsx';
 
 function formatRelativeTime(dateStr) {
   const now = new Date();
@@ -13,8 +14,8 @@ function formatRelativeTime(dateStr) {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSecs < 60) return 'Baru saja';
-  if (diffMins < 60) return `${diffMins} menit lalu`;
-  if (diffHours < 24) return `${diffHours} jam lalu`;
+  if (diffMins < 60) return `${diffMins}m lalu`;
+  if (diffHours < 24) return `${diffHours}j lalu`;
   if (diffDays === 1) return 'Kemarin';
   return `${diffDays} hari lalu`;
 }
@@ -116,24 +117,34 @@ export default function Notifications() {
     fetchNotifications(nextPage, true);
   }
 
+  const hasUnread = notifications.some((n) => !n.isRead);
+
   return (
     <div className="notifications-container">
+      {/* Header */}
       <div className="notifications-header">
         <h2>Notifikasi</h2>
-        {notifications.some((n) => !n.isRead) && (
-          <button className="btn-text" onClick={handleMarkAllRead}>
+        {hasUnread && (
+          <button className="profile-btn" style={{ fontSize: '13px', padding: '6px 12px' }} onClick={handleMarkAllRead}>
             Tandai semua dibaca
           </button>
         )}
       </div>
 
       {notifications.length === 0 && !loading && (
-        <div className="center muted">Belum ada notifikasi.</div>
+        <div className="center">
+          <IconNotification size={48} className="muted" style={{ marginBottom: 16 }} />
+          <h3>Belum ada notifikasi</h3>
+          <p style={{ marginTop: 8 }}>Notifikasi seperti Like, Komentar, Repost, atau sebutan Anda akan muncul di sini.</p>
+        </div>
       )}
 
+      {/* Notifications List */}
       <div className="notifications-list">
         {notifications.map((n) => {
           const isModeration = n.type.startsWith('moderation_');
+          const isSystem = n.type === 'system' || n.type === 'admin';
+          
           let notifClass = `notification-item ${n.isRead ? 'read' : 'unread'}`;
           if (isModeration) {
             notifClass += ' moderation-alert';
@@ -145,13 +156,21 @@ export default function Notifications() {
               className={notifClass}
               onClick={() => handleNotifClick(n)}
             >
+              {/* Unread Accent Dot */}
+              {!n.isRead && <div className="notification-dot"></div>}
+
+              {/* Notification Icon/Avatar */}
               <div className="notification-icon-container">
                 {isModeration ? (
-                  <span className="moderation-icon">⚠️</span>
-                ) : (n.type === 'system' || n.type === 'admin') ? (
-                  <div className="avatar-placeholder brand-notif">A</div>
+                  <div className="avatar-placeholder" style={{ background: 'rgba(224, 92, 92, 0.12)', color: 'var(--color-danger)', border: '1px solid rgba(224, 92, 92, 0.3)' }}>
+                    ⚠️
+                  </div>
+                ) : isSystem ? (
+                  <div className="avatar-placeholder" style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}>
+                    📢
+                  </div>
                 ) : n.senderAvatar ? (
-                  <img src={n.senderAvatar} alt="avatar" className="avatar" />
+                  <img src={n.senderAvatar} alt="avatar" className="avatar-img" />
                 ) : (
                   <div className="avatar-placeholder">
                     {n.senderUsername ? n.senderUsername[0].toUpperCase() : 'U'}
@@ -159,9 +178,10 @@ export default function Notifications() {
                 )}
               </div>
 
+              {/* Message Details */}
               <div className="notification-content">
                 <p className="notification-message">
-                  {n.senderUsername && (
+                  {n.senderUsername && !isSystem && !isModeration && (
                     <strong style={{ marginRight: 4 }}>@{n.senderUsername}</strong>
                   )}
                   {n.message}
@@ -169,17 +189,18 @@ export default function Notifications() {
                 <span className="notification-time">{formatRelativeTime(n.createdAt)}</span>
               </div>
 
-              <div className="notification-actions">
+              {/* Actions & Preview */}
+              <div className="notification-actions" onClick={(e) => e.stopPropagation()}>
                 {n.refMediaPreview && (
-                  <img src={n.refMediaPreview} className="media-preview" alt="preview" />
+                  <img src={n.refMediaPreview} className="notification-media-preview" alt="preview" />
                 )}
                 {!n.isBroadcast && (
                   <button
                     className="delete-notif-btn"
                     onClick={(e) => handleDeleteNotif(e, n._id)}
-                    title="Hapus"
+                    title="Hapus notifikasi"
                   >
-                    ×
+                    <IconTrash size={16} />
                   </button>
                 )}
               </div>
@@ -190,11 +211,11 @@ export default function Notifications() {
 
       {hasMore && !loading && (
         <button className="load-more-btn" onClick={loadMore}>
-          Muat Lebih Banyak
+          Muat lebih banyak
         </button>
       )}
 
-      {loading && <div className="center">Memuat...</div>}
+      {loading && <div className="center">Memuat notifikasi...</div>}
     </div>
   );
 }

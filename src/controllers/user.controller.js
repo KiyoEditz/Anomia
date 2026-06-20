@@ -1,12 +1,13 @@
 const User = require('../models/User');
 const { uploadBuffer, destroyAsset } = require('../utils/cloudinary');
+const { sanitizePostContent, sanitizeBio } = require('../utils/sanitize');
 
 exports.updateMe = async (req, res, next) => {
   try {
     const { displayName, bio } = req.body;
     const update = {};
-    if (displayName !== undefined) update.displayName = String(displayName).slice(0, 50);
-    if (bio !== undefined) update.bio = String(bio).slice(0, 280);
+    if (displayName !== undefined) update.displayName = sanitizePostContent(String(displayName)).slice(0, 50);
+    if (bio !== undefined) update.bio = sanitizeBio(String(bio)).slice(0, 280);
     const user = await User.findByIdAndUpdate(req.userId, update, { new: true });
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
     res.json({ user: user.toPublicJSON() });
@@ -17,6 +18,9 @@ exports.updateMe = async (req, res, next) => {
 
 exports.getByUsername = async (req, res, next) => {
   try {
+    if (/^[a-f\d]{24}$/i.test(req.params.username)) {
+      return res.status(404).json({ error: 'User tidak ditemukan' });
+    }
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
     res.json({ user: user.toPublicJSON() });
@@ -203,6 +207,25 @@ exports.listModerationLogs = async (req, res, next) => {
       .populate('targetPostId')
       .populate('targetCommentId');
     res.json({ logs });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/users/search
+exports.searchUsers = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const q = {};
+    if (search) {
+      const safe = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      q.$or = [
+        { username: { $regex: safe, $options: 'i' } },
+        { displayName: { $regex: safe, $options: 'i' } }
+      ];
+    }
+    const users = await User.find(q).limit(20);
+    res.json({ users: users.map((u) => u.toPublicJSON()) });
   } catch (e) {
     next(e);
   }

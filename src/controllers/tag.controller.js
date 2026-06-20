@@ -46,8 +46,15 @@ exports.detailBySlug = async (req, res, next) => {
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate('author', 'username displayName')
-      .populate('tags', 'name slug category');
+      .populate('author', 'username displayName avatarUrl role')
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: 'username displayName avatarUrl role' },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
 
     res.json({ tag, posts, page });
   } catch (e) {

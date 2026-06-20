@@ -15,6 +15,8 @@ const notificationSchema = new mongoose.Schema(
         'comment_reply',
         'comment_like',
         'post_like',
+        'post_repost',
+        'post_quote',
         'moderation_removed',
         'moderation_warning',
         'moderation_suspended',

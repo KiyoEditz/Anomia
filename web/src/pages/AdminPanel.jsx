@@ -50,11 +50,10 @@ export default function AdminPanel() {
     if (!promoUsername.trim() || promoBusy) return;
     setPromoBusy(true);
     try {
-      // First find the user to get their ID
       const userRes = await api.get(`/users/${promoUsername.trim()}`);
       const targetUser = userRes.data.user;
       if (!targetUser) throw new Error('User tidak ditemukan');
-      
+
       await api.patch(`/users/${targetUser.id || targetUser._id}/role`, { role: 'mod' });
       alert(`@${promoUsername} berhasil dijadikan Moderator!`);
       setPromoUsername('');
@@ -66,122 +65,135 @@ export default function AdminPanel() {
     }
   }
 
+  function getActionLabel(action) {
+    switch (action) {
+      case 'delete_post': return 'Hapus Post';
+      case 'delete_comment': return 'Hapus Komentar';
+      case 'assign_role': return 'Perubahan Role';
+      case 'suspend_user': return 'Suspend Akun';
+      default: return action;
+    }
+  }
+
   if (user?.role !== 'dev') {
-    return <div className="center error">Akses Ditolak. Halaman ini hanya untuk Developer.</div>;
+    return <div className="center">Akses Ditolak. Halaman ini hanya untuk Developer.</div>;
   }
 
   if (loading) return <div className="center">Memuat panel admin...</div>;
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        🛠️ Panel Developer & Admin
-      </h2>
+    <div style={{ padding: '16px 0' }}>
+      <h2 style={{ marginBottom: 24, padding: '0 16px' }}>Panel Developer & Admin</h2>
 
-      {err && <div className="card error">{err}</div>}
+      {err && <div className="error" style={{ padding: '0 16px' }}>{err}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        {/* Moderator Management */}
-        <section className="card">
-          <h3>🛡️ Manajemen Moderator</h3>
-          
-          <form onSubmit={handlePromote} style={{ display: 'flex', gap: '8px', marginBottom: 20 }}>
-            <input 
-              type="text" 
-              placeholder="Masukkan username user..." 
-              value={promoUsername}
-              onChange={(e) => setPromoUsername(e.target.value)}
-              style={{ maxWidth: 300 }}
-              required
-            />
-            <button type="submit" disabled={promoBusy} style={{ whiteSpace: 'nowrap' }}>
-              {promoBusy ? 'Memproses...' : 'Tambah Moderator'}
-            </button>
-          </form>
+      {/* Moderator Management */}
+      <section className="admin-section">
+        <h3>Manajemen Moderator</h3>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #2f3336', textAlign: 'left' }}>
-                <th style={{ padding: '8px 0' }}>Username</th>
-                <th style={{ padding: '8px 0' }}>Role</th>
-                <th style={{ padding: '8px 0' }}>Diberikan Oleh</th>
-                <th style={{ padding: '8px 0' }}>Waktu</th>
-                <th style={{ padding: '8px 0', textAlign: 'right' }}>Aksi</th>
+        <form className="admin-form" onSubmit={handlePromote}>
+          <input
+            type="text"
+            placeholder="Masukkan username user..."
+            value={promoUsername}
+            onChange={(e) => setPromoUsername(e.target.value)}
+            required
+          />
+          <button type="submit" disabled={promoBusy}>
+            {promoBusy ? 'Memproses...' : 'Tambah Moderator'}
+          </button>
+        </form>
+
+        {/* Desktop Table */}
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Diberikan Oleh</th>
+              <th>Waktu</th>
+              <th style={{ textAlign: 'right' }}>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {moderators.map((m) => (
+              <tr key={m._id}>
+                <td style={{ fontWeight: 'bold' }}>@{m.username}</td>
+                <td><BadgeRole role={m.role} /></td>
+                <td className="muted">
+                  {m.roleAssignedBy ? `@${m.roleAssignedBy.username}` : 'System / Owner'}
+                </td>
+                <td className="muted" style={{ fontSize: '13px' }}>
+                  {m.roleAssignedAt ? new Date(m.roleAssignedAt).toLocaleDateString() : '-'}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  {m.role === 'mod' ? (
+                    <button className="danger-btn" onClick={() => handleRevoke(m._id, m.username)}>
+                      Cabut
+                    </button>
+                  ) : (
+                    <span className="muted" style={{ fontSize: '12px' }}>Locked</span>
+                  )}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {moderators.map((m) => (
-                <tr key={m._id} style={{ borderBottom: '1px solid #2f3336' }}>
-                  <td style={{ padding: '12px 0', fontWeight: 'bold' }}>@{m.username}</td>
-                  <td style={{ padding: '12px 0' }}>
-                    <BadgeRole role={m.role} />
-                  </td>
-                  <td style={{ padding: '12px 0', color: '#8b98a5' }}>
-                    {m.roleAssignedBy ? `@${m.roleAssignedBy.username}` : 'System / Owner'}
-                  </td>
-                  <td style={{ padding: '12px 0', color: '#8b98a5', fontSize: '13px' }}>
-                    {m.roleAssignedAt ? new Date(m.roleAssignedAt).toLocaleDateString() : '-'}
-                  </td>
-                  <td style={{ padding: '12px 0', textAlign: 'right' }}>
-                    {m.role === 'mod' ? (
-                      <button className="danger" style={{ fontSize: '12px', padding: '4px 10px' }} onClick={() => handleRevoke(m._id, m.username)}>
-                        Cabut
-                      </button>
-                    ) : (
-                      <span className="muted" style={{ fontSize: '12px' }}>Locked</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            ))}
+          </tbody>
+        </table>
 
-        {/* Audit Logs */}
-        <section className="card">
-          <h3>📋 Log Moderasi Manual</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: 16 }}>
-            {logs.length === 0 ? (
-              <div className="muted center">Belum ada log aktivitas.</div>
-            ) : (
-              logs.map((log) => (
-                <div 
-                  key={log._id} 
-                  style={{ 
-                    padding: '12px', 
-                    borderRadius: '8px', 
-                    border: '1px solid #2f3336', 
-                    background: '#1c2024'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <div>
-                      <strong style={{ color: '#ff6b35' }}>
-                        {log.action === 'delete_post' && '🗑️ Hapus Post'}
-                        {log.action === 'delete_comment' && '💬 Hapus Komentar'}
-                        {log.action === 'assign_role' && '🛡️ Perubahan Role'}
-                        {log.action === 'suspend_user' && '🚫 Suspend Akun'}
-                      </strong>
-                      <span className="muted" style={{ marginLeft: 8 }}>
-                        oleh @{log.performedBy?.username || 'System'} ({log.performedByRole})
-                      </span>
-                    </div>
-                    <span className="muted" style={{ fontSize: '12px' }}>
-                      {new Date(log.createdAt).toLocaleString()}
+        {/* Mobile Card List */}
+        <div className="admin-card-list">
+          {moderators.map((m) => (
+            <div key={m._id} className="admin-card-item">
+              <div className="admin-card-item-info">
+                <div className="admin-card-item-name">
+                  @{m.username} <BadgeRole role={m.role} />
+                </div>
+                <div className="admin-card-item-meta">
+                  {m.roleAssignedBy ? `Oleh @${m.roleAssignedBy.username}` : 'System / Owner'}
+                  {m.roleAssignedAt ? ` · ${new Date(m.roleAssignedAt).toLocaleDateString()}` : ''}
+                </div>
+              </div>
+              {m.role === 'mod' && (
+                <button className="admin-table danger-btn" onClick={() => handleRevoke(m._id, m.username)}>
+                  Cabut
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Audit Logs */}
+      <section className="admin-section">
+        <h3>Log Moderasi</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {logs.length === 0 ? (
+            <div className="center muted">Belum ada log aktivitas.</div>
+          ) : (
+            logs.map((log) => (
+              <div key={log._id} className="audit-log-card">
+                <div className="audit-log-header">
+                  <div>
+                    <span className="audit-log-action">{getActionLabel(log.action)}</span>
+                    <span className="audit-log-performer">
+                      {' '}oleh @{log.performedBy?.username || 'System'} ({log.performedByRole})
                     </span>
                   </div>
-                  <div style={{ fontSize: '14px', margin: '4px 0' }}>
-                    <strong>Target:</strong> @{log.targetUserId?.username || 'Unknown'}
-                  </div>
-                  <div style={{ fontSize: '14px', background: 'rgba(0, 0, 0, 0.2)', padding: '6px 10px', borderRadius: '4px', borderLeft: '3px solid #ff6b35' }}>
-                    <strong>Alasan:</strong> {log.reason}
-                  </div>
+                  <span className="audit-log-time">
+                    {new Date(log.createdAt).toLocaleString()}
+                  </span>
                 </div>
-              ))
-            )}
-          </div>
-        </section>
-      </div>
+                <div className="audit-log-target">
+                  <strong>Target:</strong> @{log.targetUserId?.username || 'Unknown'}
+                </div>
+                <div className="audit-log-reason">
+                  <strong>Alasan:</strong> {log.reason}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }

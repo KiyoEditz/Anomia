@@ -6,6 +6,7 @@ const { upsertTags, splitCsv, parseTagQuery } = require('../utils/tags');
 const { uploadBuffer, destroyAsset } = require('../utils/cloudinary');
 const { createNotification } = require('../utils/notification');
 const { quickScan } = require('../utils/moderation');
+const { sanitizePostContent } = require('../utils/sanitize');
 
 const AUTHOR_FIELDS = 'username displayName avatarUrl role';
 
@@ -41,12 +42,13 @@ async function buildTagFilter(req) {
 
 exports.create = async (req, res, next) => {
   try {
-    const { content } = req.body;
     let { tags } = req.body;
     if (typeof tags === 'string') {
       try { tags = JSON.parse(tags); } catch { tags = []; }
     }
-    if (!content || !content.trim()) {
+    // Sanitasi wajib sebelum menyentuh DB — strip semua HTML dari konten user.
+    const content = sanitizePostContent(req.body.content);
+    if (!content) {
       return res.status(400).json({ error: 'content tidak boleh kosong' });
     }
 
@@ -98,6 +100,7 @@ exports.create = async (req, res, next) => {
       mediaPublicId,
       mediaType,
       status: 'published',
+      contentHash: req.contentHash || null,
       quickScan: scanResult ? {
         provider: scanResult.provider,
         result: scanResult.isApproved ? 'approved' : 'rejected',
@@ -107,6 +110,11 @@ exports.create = async (req, res, next) => {
     });
 
     await bumpTagUsage(tagDocs.map((t) => t._id), 1);
+
+    if (req.postLimitRecord) {
+      const { incrementPostCount } = require('../services/postLimitService');
+      await incrementPostCount(req.userId, req.postLimitRecord, req.newRapidStreak);
+    }
 
     // Thorough scan simulation logic (local development / testing)
     if (req.file && !process.env.MODERATION_WEBHOOK_URL) {
@@ -163,6 +171,14 @@ exports.create = async (req, res, next) => {
     const populated = await Post.findById(post._id)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category');
+
+    try {
+      const { emitBroadcast } = require('../utils/socket');
+      emitBroadcast('new_post', populated);
+    } catch (err) {
+      console.error('[Socket Error]: Failed to emit new post', err);
+    }
+
     res.status(201).json({ post: populated });
   } catch (e) {
     next(e);
@@ -180,12 +196,59 @@ exports.list = async (req, res, next) => {
     // Only fetch published posts
     filter.status = 'published';
 
+    // Support text search query
+    if (req.query.search) {
+      const safe = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.content = { $regex: safe, $options: 'i' };
+    }
+
+    // Support engagement sorting
+    if (req.query.sort === 'engagement') {
+      const posts = await Post.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            likesCount: { $size: { $ifNull: ['$likes', []] } },
+            engagementScore: {
+              $add: [
+                { $size: { $ifNull: ['$likes', []] } },
+                { $multiply: [{ $ifNull: ['$commentsCount', 0] }, 2] }
+              ]
+            }
+          }
+        },
+        { $sort: { engagementScore: -1, createdAt: -1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: limit }
+      ]);
+
+      const populatedPosts = await Post.populate(posts, [
+        { path: 'author', select: AUTHOR_FIELDS },
+        { path: 'tags', select: 'name slug category' },
+        {
+          path: 'repostOf',
+          populate: [
+            { path: 'author', select: AUTHOR_FIELDS },
+            { path: 'tags', select: 'name slug category' }
+          ]
+        }
+      ]);
+      return res.json({ posts: populatedPosts, page });
+    }
+
     const posts = await Post.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate('author', AUTHOR_FIELDS)
-      .populate('tags', 'name slug category');
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
     res.json({ posts, page });
   } catch (e) {
     next(e);
@@ -197,8 +260,11 @@ exports.feed = async (req, res, next) => {
     const me = await User.findById(req.userId).select('following');
     const authorIds = [...me.following, req.userId];
     const baseFilter = await buildTagFilter(req);
-    if (baseFilter._impossible) return res.json({ posts: [] });
+    if (baseFilter._impossible) return res.json({ posts: [], page: 1 });
     delete baseFilter._impossible;
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 20;
 
     const posts = await Post.find({
       ...baseFilter,
@@ -206,10 +272,18 @@ exports.feed = async (req, res, next) => {
       status: 'published',
     })
       .sort({ createdAt: -1 })
-      .limit(50)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .populate('author', AUTHOR_FIELDS)
-      .populate('tags', 'name slug category');
-    res.json({ posts });
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
+    res.json({ posts, page });
   } catch (e) {
     next(e);
   }
@@ -219,7 +293,14 @@ exports.detail = async (req, res, next) => {
   try {
     const post = await Post.findById(req.params.id)
       .populate('author', 'username displayName bio avatarUrl role')
-      .populate('tags', 'name slug category');
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
     if (!post || post.status !== 'published') return res.status(404).json({ error: 'Post tidak ditemukan' });
     res.json({ post });
   } catch (e) {
@@ -231,12 +312,24 @@ exports.listByUser = async (req, res, next) => {
   try {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+    
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 20;
+
     const posts = await Post.find({ author: user._id, status: 'published' })
       .sort({ createdAt: -1 })
-      .limit(50)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .populate('author', AUTHOR_FIELDS)
-      .populate('tags', 'name slug category');
-    res.json({ posts });
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
+    res.json({ posts, page });
   } catch (e) {
     next(e);
   }
@@ -352,6 +445,183 @@ exports.moderateRemove = async (req, res, next) => {
     });
 
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /api/posts/:id/bookmark
+exports.bookmark = async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post || post.status === 'removed') return res.status(404).json({ error: 'Post tidak ditemukan' });
+    await User.updateOne({ _id: req.userId }, { $addToSet: { bookmarks: post._id } });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /api/posts/:id/bookmark
+exports.unbookmark = async (req, res, next) => {
+  try {
+    await User.updateOne({ _id: req.userId }, { $pull: { bookmarks: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /api/posts/bookmarks
+exports.listBookmarks = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId).populate({
+      path: 'bookmarks',
+      match: { status: 'published' },
+      populate: [
+        { path: 'author', select: AUTHOR_FIELDS },
+        { path: 'tags', select: 'name slug category' },
+        {
+          path: 'repostOf',
+          populate: [
+            { path: 'author', select: AUTHOR_FIELDS },
+            { path: 'tags', select: 'name slug category' }
+          ]
+        }
+      ]
+    });
+    res.json({ posts: user ? user.bookmarks : [] });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /api/posts/:id/repost
+exports.repost = async (req, res, next) => {
+  try {
+    const originalPost = await Post.findById(req.params.id);
+    if (!originalPost || originalPost.status !== 'published') {
+      return res.status(404).json({ error: 'Postingan tidak ditemukan' });
+    }
+
+    const alreadyReposted = originalPost.reposts.includes(req.userId);
+    if (alreadyReposted) {
+      return res.status(400).json({ error: 'Sudah di-repost' });
+    }
+
+    // Add user to original post's reposts list
+    await Post.updateOne({ _id: originalPost._id }, { $addToSet: { reposts: req.userId } });
+
+    // Create a new post representing the repost
+    const repost = await Post.create({
+      author: req.userId,
+      content: '', // Repost doesn't have its own content
+      status: 'published',
+      repostOf: originalPost._id,
+    });
+
+    // Notify author of original post
+    if (String(originalPost.author) !== String(req.userId)) {
+      await createNotification({
+        recipientId: originalPost.author,
+        senderId: req.userId,
+        type: 'post_repost',
+        message: `@${req.user.username} me-repost postinganmu`,
+        deepLink: `/post/${originalPost._id}`,
+        refPostId: originalPost._id,
+        refMediaPreview: originalPost.mediaUrl,
+      });
+    }
+
+    const populated = await Post.findById(repost._id)
+      .populate('author', AUTHOR_FIELDS)
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
+
+    res.status(201).json({ post: populated });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /api/posts/:id/repost
+exports.unrepost = async (req, res, next) => {
+  try {
+    const originalPost = await Post.findById(req.params.id);
+    if (!originalPost) return res.status(404).json({ error: 'Postingan tidak ditemukan' });
+
+    // Remove user from original post's reposts list
+    await Post.updateOne({ _id: originalPost._id }, { $pull: { reposts: req.userId } });
+
+    // Delete the repost post created by this user
+    await Post.deleteOne({ author: req.userId, repostOf: originalPost._id });
+
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /api/posts/:id/quote
+exports.quote = async (req, res, next) => {
+  try {
+    const { tags } = req.body;
+    const originalPost = await Post.findById(req.params.id);
+    if (!originalPost || originalPost.status !== 'published') {
+      return res.status(404).json({ error: 'Postingan tidak ditemukan' });
+    }
+
+    const content = sanitizePostContent(req.body.content);
+    if (!content) {
+      return res.status(400).json({ error: 'Konten quote tidak boleh kosong' });
+    }
+
+    let parsedTags = tags;
+    if (typeof tags === 'string') {
+      try { parsedTags = JSON.parse(tags); } catch { parsedTags = []; }
+    }
+    const tagDocs = Array.isArray(parsedTags) ? await upsertTags(parsedTags) : [];
+
+    const quotePost = await Post.create({
+      author: req.userId,
+      content,
+      tags: tagDocs.map((t) => t._id),
+      status: 'published',
+      repostOf: originalPost._id,
+    });
+
+    await bumpTagUsage(tagDocs.map((t) => t._id), 1);
+
+    // Notify original post's author
+    if (String(originalPost.author) !== String(req.userId)) {
+      await createNotification({
+        recipientId: originalPost.author,
+        senderId: req.userId,
+        type: 'post_quote',
+        message: `@${req.user.username} mengutip postinganmu`,
+        deepLink: `/post/${quotePost._id}`,
+        refPostId: quotePost._id,
+        refMediaPreview: quotePost.mediaUrl,
+      });
+    }
+
+    const populated = await Post.findById(quotePost._id)
+      .populate('author', AUTHOR_FIELDS)
+      .populate('tags', 'name slug category')
+      .populate({
+        path: 'repostOf',
+        populate: [
+          { path: 'author', select: AUTHOR_FIELDS },
+          { path: 'tags', select: 'name slug category' }
+        ]
+      });
+
+    res.status(201).json({ post: populated });
   } catch (e) {
     next(e);
   }

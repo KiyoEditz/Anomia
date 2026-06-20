@@ -68,10 +68,22 @@ exports.moderation = async (req, res, next) => {
 
       const user = await User.findById(post.author);
       if (user) {
+        // 1. Send moderation_removed notification for the post removal
+        await createNotification({
+          recipientId: user._id,
+          senderId: null,
+          type: 'moderation_removed',
+          message: 'Postingan Anda telah dihapus karena melanggar ketentuan komunitas.',
+          deepLink: '/community-guidelines',
+          refPostId: post._id,
+          refMediaPreview: post.mediaUrl,
+        });
+
+        // 2. Add strike and send warning/suspended notification
         user.strikeCount += 1;
 
         let notifType = 'moderation_warning';
-        let notifMessage = 'Postingan Anda telah dihapus karena melanggar ketentuan komunitas.';
+        let notifMessage = `Peringatan ${user.strikeCount}: Ini adalah peringatan resmi untuk akunmu.`;
         const deepLink = '/community-guidelines';
 
         if (user.strikeCount >= 3) {
@@ -79,8 +91,6 @@ exports.moderation = async (req, res, next) => {
           user.suspendedAt = new Date();
           notifType = 'moderation_suspended';
           notifMessage = 'Akun Anda telah ditangguhkan karena menerima 3 strike pelanggaran ketentuan komunitas.';
-        } else {
-          notifMessage = `Peringatan ${user.strikeCount}: Postingan Anda dihapus karena melanggar ketentuan komunitas.`;
         }
 
         await user.save();

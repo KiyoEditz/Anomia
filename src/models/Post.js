@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const postSchema = new mongoose.Schema(
   {
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    content: { type: String, required: true, trim: true, maxlength: 500 },
+    content: { type: String, trim: true, maxlength: 500, default: '' },
     mediaUrl: { type: String, default: '' },
     mediaPublicId: { type: String, default: '' },
     mediaType: { type: String, enum: ['image', 'video', ''], default: '' },
@@ -24,10 +24,15 @@ const postSchema = new mongoose.Schema(
       checkedAt: { type: Date, default: null }
     },
     removedReason: { type: String, default: null },
+    contentHash: { type: String, default: null },
+    repostOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null, index: true },
+    reposts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true }
 );
 
 postSchema.index({ tags: 1, createdAt: -1 });
+postSchema.index({ author: 1, contentHash: 1 });
+postSchema.index({ repostOf: 1 });
 
 module.exports = mongoose.model('Post', postSchema);
