@@ -260,19 +260,23 @@ exports.feed = async (req, res, next) => {
     const me = await User.findById(req.userId).select('following');
     const authorIds = [...me.following, req.userId];
     const baseFilter = await buildTagFilter(req);
-    if (baseFilter._impossible) return res.json({ posts: [], page: 1 });
+    if (baseFilter._impossible) return res.json({ posts: [], nextCursor: null });
     delete baseFilter._impossible;
 
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = 20;
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const before = req.query.before || null;
 
-    const posts = await Post.find({
+    const filter = {
       ...baseFilter,
       author: { $in: authorIds },
       status: 'published',
-    })
+    };
+    if (before) {
+      filter.createdAt = { $lt: new Date(before) };
+    }
+
+    const posts = await Post.find(filter)
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
       .limit(limit)
       .populate('author', AUTHOR_FIELDS)
       .populate('tags', 'name slug category')
@@ -283,7 +287,13 @@ exports.feed = async (req, res, next) => {
           { path: 'tags', select: 'name slug category' }
         ]
       });
-    res.json({ posts, page });
+
+    const nextCursor =
+      posts.length > 0
+        ? posts[posts.length - 1].createdAt
+        : null;
+
+    res.json({ posts, nextCursor });
   } catch (e) {
     next(e);
   }

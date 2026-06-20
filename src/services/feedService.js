@@ -3,7 +3,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
 
-const WEIGHTS = { engagement: 1.0, recency: 100, affinity: 1.0 };
+const WEIGHTS = { engagement: 0.5, recency: 500, affinity: 0.8 };
 const AUTHOR_FIELDS = 'username displayName avatarUrl role';
 const POPULATE_PIPELINE = [
   {
@@ -89,65 +89,21 @@ async function getRecentInteractionAuthors(userId) {
   return [...authorIds];
 }
 
-const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
+const getForYouFeed = async (userId, { limit = 20, before } = {}) => {
   const now = new Date();
   const currentUser = await User.findById(userId).select('following followers').lean();
   const followingIds = (currentUser.following || []).map((id) => new mongoose.Types.ObjectId(id));
   const followerIds = new Set((currentUser.followers || []).map((id) => id.toString()));
 
   const isNewUser = followingIds.length === 0;
-  const weights = isNewUser ? { ...WEIGHTS, engagement: 1.5 } : WEIGHTS;
+  const weights = isNewUser ? { ...WEIGHTS, engagement: 1.0 } : WEIGHTS;
 
   const recentInteractionAuthors = isNewUser
     ? []
     : await getRecentInteractionAuthors(userId);
-  const recentInteractionSet = new Set(recentInteractionAuthors);
-
-  const affinityBranches = [];
-  if (followingIds.length > 0) {
-    affinityBranches.push({
-      case: {
-        $and: [
-          { $in: ['$author', followingIds] },
-          {
-            $in: [
-              { $toString: '$author' },
-              [...followerIds].filter((id) => followingIds.some((fid) => fid.toString() === id)),
-            ],
-          },
-        ],
-      },
-      then: 8,
-    });
-    affinityBranches.push({
-      case: { $in: ['$author', followingIds] },
-      then: 5,
-    });
-  }
-  if (followerIds.size > 0) {
-    affinityBranches.push({
-      case: { $in: [{ $toString: '$author' }, [...followerIds]] },
-      then: 3,
-    });
-  }
-  if (recentInteractionAuthors.length > 0) {
-    affinityBranches.push({
-      case: {
-        $in: [
-          { $toString: '$author' },
-          recentInteractionAuthors,
-        ],
-      },
-      then: 2,
-    });
-  }
-
-  const mutualFollowIds = followingIds
-    .filter((fid) => followerIds.has(fid.toString()))
-    .map((id) => id.toString());
 
   const affinityField =
-    affinityBranches.length > 0
+    followingIds.length > 0 || followerIds.size > 0 || recentInteractionAuthors.length > 0
       ? {
           affinityScore: {
             $add: [
@@ -155,12 +111,7 @@ const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
               { $cond: [{ $in: [{ $toString: '$author' }, [...followerIds]] }, 3, 0] },
               {
                 $cond: [
-                  {
-                    $in: [
-                      { $toString: '$author' },
-                      recentInteractionAuthors,
-                    ],
-                  },
+                  { $in: [{ $toString: '$author' }, recentInteractionAuthors] },
                   2,
                   0,
                 ],
@@ -170,8 +121,13 @@ const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
         }
       : { affinityScore: { $literal: 0 } };
 
+  const matchStage = { status: 'published' };
+  if (before) {
+    matchStage.createdAt = { $lt: new Date(before) };
+  }
+
   const pipeline = [
-    { $match: { status: 'published' } },
+    { $match: matchStage },
     {
       $addFields: {
         ageInHours: {
@@ -193,7 +149,7 @@ const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
     {
       $addFields: {
         recencyScore: {
-          $divide: [1, { $pow: [{ $add: ['$ageInHours', 2] }, 1.5] }],
+          $divide: [1, { $pow: [{ $add: ['$ageInHours', 2] }, 1.2] }],
         },
       },
     },
@@ -209,8 +165,7 @@ const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
         },
       },
     },
-    { $sort: { totalScore: -1 } },
-    { $skip: (page - 1) * limit },
+    { $sort: { totalScore: -1, createdAt: -1 } },
     { $limit: limit },
     ...POPULATE_PIPELINE,
   ];
@@ -218,13 +173,17 @@ const getForYouFeed = async (userId, { page = 1, limit = 20 } = {}) => {
   return Post.aggregate(pipeline);
 };
 
-const getRecentFeed = async (userId, { page = 1, limit = 20 } = {}) => {
+const getRecentFeed = async (userId, { limit = 20, before } = {}) => {
   const currentUser = await User.findById(userId).select('following').lean();
   const authorIds = [...(currentUser.following || []), new mongoose.Types.ObjectId(userId)];
 
-  return Post.find({ author: { $in: authorIds }, status: 'published' })
+  const filter = { author: { $in: authorIds }, status: 'published' };
+  if (before) {
+    filter.createdAt = { $lt: new Date(before) };
+  }
+
+  return Post.find(filter)
     .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
     .limit(limit)
     .populate('author', AUTHOR_FIELDS)
     .populate('tags', 'name slug category')
@@ -253,7 +212,7 @@ const feedCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const getForYouFeedCached = async (userId, options) => {
-  const cacheKey = `${userId}_${options.page || 1}`;
+  const cacheKey = `${userId}_${options.before || 'latest'}`;
   const cached = feedCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {

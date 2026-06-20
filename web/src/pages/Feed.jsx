@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../api';
 import { useAuth } from '../auth.jsx';
 import { CreatePostBar } from '../components/Composer.jsx';
@@ -22,56 +22,73 @@ function SkeletonLoader() {
   );
 }
 
+const feedCache = {
+  for_you: { posts: [], nextCursor: null, hasMore: true, scrollY: 0 },
+  following: { posts: [], nextCursor: null, hasMore: true, scrollY: 0 },
+};
+
 export default function Feed() {
   const { user, socket } = useAuth();
   const [posts, setPosts] = useState([]);
-  const [activeTab, setActiveTab] = useState('for_you'); // 'for_you' or 'following'
+  const [activeTab, setActiveTab] = useState('for_you');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
 
-  // Real-time new posts queue
   const [newPostsQueue, setNewPostsQueue] = useState([]);
-  
-  // Pull to refresh gesture states
+
   const [pulling, setPulling] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
   const startTouchY = useRef(0);
-  
-  const bottomRef = useRef(null);
 
-  // Load posts for tab
-  async function loadFeed(pageNum = 1, append = false, forceSilent = false) {
-    if (!forceSilent) {
-      if (pageNum === 1) setLoading(true);
+  const bottomRef = useRef(null);
+  const restoringScroll = useRef(false);
+  const mountedRef = useRef(false);
+
+  function saveCache(tab, data) {
+    feedCache[tab] = { ...feedCache[tab], ...data };
+  }
+
+  function saveCacheFromState() {
+    feedCache[activeTab] = {
+      posts: posts,
+      nextCursor: nextCursor,
+      hasMore: hasMore,
+      scrollY: window.scrollY,
+    };
+  }
+
+  async function loadFeed({ append = false, cursor = null, silent = false } = {}) {
+    if (!silent) {
+      if (!append) setLoading(true);
       else setLoadingMore(true);
     }
-    
+
     try {
-      let endpoint = '/posts';
-      let params = { page: pageNum };
-      
-      if (activeTab === 'for_you') {
-        params.sort = 'engagement';
-      } else {
-        endpoint = '/posts/feed';
-      }
+      const endpoint = activeTab === 'for_you' ? '/feed/for-you' : '/feed/recent';
+      const params = {};
+      if (cursor) params.before = cursor;
 
       const r = await api.get(endpoint, { params });
       const fetchedPosts = r.data.posts || [];
-      
-      if (fetchedPosts.length < 20) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
-      }
+      const newCursor = r.data.nextCursor || null;
+
+      const fetchedHasMore = fetchedPosts.length >= 20 && newCursor !== null;
 
       if (append) {
-        setPosts((prev) => [...prev, ...fetchedPosts]);
+        setPosts((prev) => {
+          const merged = [...prev, ...fetchedPosts];
+          saveCache(activeTab, { posts: merged, nextCursor: newCursor, hasMore: fetchedHasMore });
+          return merged;
+        });
       } else {
         setPosts(fetchedPosts);
+        saveCache(activeTab, { posts: fetchedPosts, nextCursor: newCursor, hasMore: fetchedHasMore });
       }
+
+      setNextCursor(newCursor);
+      setHasMore(fetchedHasMore);
       setNewPostsQueue([]);
     } catch (e) {
       console.error(e);
@@ -83,28 +100,67 @@ export default function Feed() {
     }
   }
 
-  // Load on mount and tab switch
   useEffect(() => {
-    setPage(1);
-    loadFeed(1, false);
+    const cached = feedCache[activeTab];
+    if (cached && cached.posts.length > 0 && !mountedRef.current) {
+      setPosts(cached.posts);
+      setNextCursor(cached.nextCursor);
+      setHasMore(cached.hasMore);
+      setLoading(false);
+
+      restoringScroll.current = true;
+      requestAnimationFrame(() => {
+        window.scrollTo(0, cached.scrollY);
+        restoringScroll.current = false;
+      });
+    } else {
+      loadFeed();
+    }
+    mountedRef.current = true;
   }, [activeTab]);
 
-  // Listen to new-post-created from our composer
+  useEffect(() => {
+    const handleBeforeNavigate = () => {
+      saveCacheFromState();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeNavigate);
+
+    const origPushState = history.pushState;
+    const origReplaceState = history.replaceState;
+    history.pushState = function (...args) {
+      saveCacheFromState();
+      return origPushState.apply(this, args);
+    };
+    history.replaceState = function (...args) {
+      saveCacheFromState();
+      return origReplaceState.apply(this, args);
+    };
+
+    return () => {
+      saveCacheFromState();
+      window.removeEventListener('beforeunload', handleBeforeNavigate);
+      history.pushState = origPushState;
+      history.replaceState = origReplaceState;
+    };
+  }, [activeTab, posts, nextCursor, hasMore]);
+
   useEffect(() => {
     const handleNewPostCreated = (e) => {
-      // Prepend to posts list instantly
-      setPosts((prev) => [e.detail, ...prev]);
+      setPosts((prev) => {
+        const updated = [e.detail, ...prev];
+        saveCache(activeTab, { posts: updated });
+        return updated;
+      });
     };
     window.addEventListener('new-post-created', handleNewPostCreated);
     return () => window.removeEventListener('new-post-created', handleNewPostCreated);
-  }, []);
+  }, [activeTab]);
 
-  // Listen to real-time socket events for other users' posts
   useEffect(() => {
     if (!socket) return;
-    
+
     const handleNewSocketPost = (newPost) => {
-      // Only queue if it's from another user and we are on page 1
       const isMine = user && String(newPost.author?._id || newPost.author?.id || newPost.author) === String(user.id || user._id);
       if (!isMine) {
         setNewPostsQueue((prev) => [newPost, ...prev]);
@@ -115,46 +171,50 @@ export default function Feed() {
     return () => socket.off('new_post', handleNewSocketPost);
   }, [socket, user]);
 
-  // Infinite Scroll Observer
   useEffect(() => {
     if (!bottomRef.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasMore && !loading && !loadingMore) {
-          const nextPage = page + 1;
-          setPage(nextPage);
-          loadFeed(nextPage, true);
+        if (entry.isIntersecting && hasMore && !loading && !loadingMore && nextCursor) {
+          loadFeed({ append: true, cursor: nextCursor });
         }
       },
       { threshold: 0.1 }
     );
     observer.observe(bottomRef.current);
     return () => observer.disconnect();
-  }, [bottomRef.current, hasMore, loading, loadingMore, page]);
+  }, [bottomRef.current, hasMore, loading, loadingMore, nextCursor]);
 
-  // Click on active tab reloads feed (scrolls to top)
   const handleTabClick = (tab) => {
     if (activeTab === tab) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setPage(1);
-      loadFeed(1, false);
+      feedCache[tab] = { posts: [], nextCursor: null, hasMore: true, scrollY: 0 };
+      loadFeed();
     } else {
+      saveCacheFromState();
+      mountedRef.current = false;
       setActiveTab(tab);
     }
   };
 
-  // Prepend queued real-time posts
   const handleLoadNewQueuedPosts = () => {
-    setPosts((prev) => [...newPostsQueue, ...prev]);
+    setPosts((prev) => {
+      const merged = [...newPostsQueue, ...prev];
+      saveCache(activeTab, { posts: merged });
+      return merged;
+    });
     setNewPostsQueue([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePostDeleted = (id) => {
-    setPosts((prev) => prev.filter((p) => p._id !== id));
+    setPosts((prev) => {
+      const filtered = prev.filter((p) => p._id !== id);
+      saveCache(activeTab, { posts: filtered });
+      return filtered;
+    });
   };
 
-  // Pull to refresh touch handlers
   const handleTouchStart = (e) => {
     if (window.scrollY === 0) {
       startTouchY.current = e.touches[0].clientY;
@@ -176,9 +236,8 @@ export default function Feed() {
     startTouchY.current = 0;
     if (pulling) {
       if (pullProgress >= 80) {
-        // Trigger refresh
-        setPage(1);
-        loadFeed(1, false);
+        feedCache[activeTab] = { posts: [], nextCursor: null, hasMore: true, scrollY: 0 };
+        loadFeed();
       } else {
         setPulling(false);
         setPullProgress(0);
@@ -187,13 +246,12 @@ export default function Feed() {
   };
 
   return (
-    <div 
+    <div
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       style={{ minHeight: '100%' }}
     >
-      {/* Pull indicator */}
       {pulling && (
         <div style={{
           height: `${pullProgress / 2.5}px`,
@@ -212,15 +270,14 @@ export default function Feed() {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="feed-tabs">
-        <button 
+        <button
           className={`feed-tab ${activeTab === 'for_you' ? 'active' : ''}`}
           onClick={() => handleTabClick('for_you')}
         >
           Untuk Kamu
         </button>
-        <button 
+        <button
           className={`feed-tab ${activeTab === 'following' ? 'active' : ''}`}
           onClick={() => handleTabClick('following')}
         >
@@ -228,17 +285,14 @@ export default function Feed() {
         </button>
       </div>
 
-      {/* Create Post Bar */}
       <CreatePostBar />
 
-      {/* Real-time posts indicator banner */}
       {newPostsQueue.length > 0 && (
         <div className="new-posts-banner" onClick={handleLoadNewQueuedPosts}>
           {newPostsQueue.length} postingan baru. Ketuk untuk melihat.
         </div>
       )}
 
-      {/* Post feed */}
       {loading ? (
         <SkeletonLoader />
       ) : posts.length === 0 ? (
@@ -254,7 +308,6 @@ export default function Feed() {
         </div>
       )}
 
-      {/* Infinite Scroll Trigger */}
       {hasMore && !loading && (
         <div ref={bottomRef} style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {loadingMore && <div className="muted" style={{ fontSize: '14px' }}>Memuat lebih banyak...</div>}

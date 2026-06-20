@@ -5,13 +5,18 @@ const diversifyFeed = require('../utils/diversifyFeed');
 
 router.get('/for-you', authRequired, async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const before = req.query.before || null;
 
-    const posts = await getForYouFeedCached(req.user._id, { page, limit });
+    const posts = await getForYouFeedCached(req.user._id, { limit, before });
     const diversified = diversifyFeed(posts);
 
-    res.json({ posts: diversified, page });
+    const nextCursor =
+      diversified.length > 0
+        ? diversified[diversified.length - 1].createdAt
+        : null;
+
+    res.json({ posts: diversified, nextCursor });
   } catch (e) {
     next(e);
   }
@@ -19,12 +24,17 @@ router.get('/for-you', authRequired, async (req, res, next) => {
 
 router.get('/recent', authRequired, async (req, res, next) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const before = req.query.before || null;
 
-    const posts = await getRecentFeed(req.user._id, { page, limit });
+    const posts = await getRecentFeed(req.user._id, { limit, before });
 
-    res.json({ posts, page });
+    const nextCursor =
+      posts.length > 0
+        ? posts[posts.length - 1].createdAt
+        : null;
+
+    res.json({ posts, nextCursor });
   } catch (e) {
     next(e);
   }
