@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../auth.jsx';
 import { CreatePostBar } from '../components/Composer.jsx';
@@ -22,11 +22,6 @@ function SkeletonLoader() {
   );
 }
 
-const feedCache = {
-  for_you: { posts: [], nextCursor: null, hasMore: true, scrollY: 0 },
-  following: { posts: [], nextCursor: null, hasMore: true, scrollY: 0 },
-};
-
 export default function Feed() {
   const { user, socket } = useAuth();
   const [posts, setPosts] = useState([]);
@@ -43,27 +38,10 @@ export default function Feed() {
   const startTouchY = useRef(0);
 
   const bottomRef = useRef(null);
-  const restoringScroll = useRef(false);
-  const mountedRef = useRef(false);
 
-  function saveCache(tab, data) {
-    feedCache[tab] = { ...feedCache[tab], ...data };
-  }
-
-  function saveCacheFromState() {
-    feedCache[activeTab] = {
-      posts: posts,
-      nextCursor: nextCursor,
-      hasMore: hasMore,
-      scrollY: window.scrollY,
-    };
-  }
-
-  async function loadFeed({ append = false, cursor = null, silent = false } = {}) {
-    if (!silent) {
-      if (!append) setLoading(true);
-      else setLoadingMore(true);
-    }
+  async function loadFeed({ append = false, cursor = null } = {}) {
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
 
     try {
       const endpoint = activeTab === 'for_you' ? '/feed/for-you' : '/feed/recent';
@@ -74,21 +52,14 @@ export default function Feed() {
       const fetchedPosts = r.data.posts || [];
       const newCursor = r.data.nextCursor || null;
 
-      const fetchedHasMore = fetchedPosts.length >= 20 && newCursor !== null;
+      setHasMore(fetchedPosts.length >= 20 && newCursor !== null);
+      setNextCursor(newCursor);
 
       if (append) {
-        setPosts((prev) => {
-          const merged = [...prev, ...fetchedPosts];
-          saveCache(activeTab, { posts: merged, nextCursor: newCursor, hasMore: fetchedHasMore });
-          return merged;
-        });
+        setPosts((prev) => [...prev, ...fetchedPosts]);
       } else {
         setPosts(fetchedPosts);
-        saveCache(activeTab, { posts: fetchedPosts, nextCursor: newCursor, hasMore: fetchedHasMore });
       }
-
-      setNextCursor(newCursor);
-      setHasMore(fetchedHasMore);
       setNewPostsQueue([]);
     } catch (e) {
       console.error(e);
@@ -101,61 +72,17 @@ export default function Feed() {
   }
 
   useEffect(() => {
-    const cached = feedCache[activeTab];
-    if (cached && cached.posts.length > 0 && !mountedRef.current) {
-      setPosts(cached.posts);
-      setNextCursor(cached.nextCursor);
-      setHasMore(cached.hasMore);
-      setLoading(false);
-
-      restoringScroll.current = true;
-      requestAnimationFrame(() => {
-        window.scrollTo(0, cached.scrollY);
-        restoringScroll.current = false;
-      });
-    } else {
-      loadFeed();
-    }
-    mountedRef.current = true;
+    setNextCursor(null);
+    loadFeed();
   }, [activeTab]);
-
-  useEffect(() => {
-    const handleBeforeNavigate = () => {
-      saveCacheFromState();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeNavigate);
-
-    const origPushState = history.pushState;
-    const origReplaceState = history.replaceState;
-    history.pushState = function (...args) {
-      saveCacheFromState();
-      return origPushState.apply(this, args);
-    };
-    history.replaceState = function (...args) {
-      saveCacheFromState();
-      return origReplaceState.apply(this, args);
-    };
-
-    return () => {
-      saveCacheFromState();
-      window.removeEventListener('beforeunload', handleBeforeNavigate);
-      history.pushState = origPushState;
-      history.replaceState = origReplaceState;
-    };
-  }, [activeTab, posts, nextCursor, hasMore]);
 
   useEffect(() => {
     const handleNewPostCreated = (e) => {
-      setPosts((prev) => {
-        const updated = [e.detail, ...prev];
-        saveCache(activeTab, { posts: updated });
-        return updated;
-      });
+      setPosts((prev) => [e.detail, ...prev]);
     };
     window.addEventListener('new-post-created', handleNewPostCreated);
     return () => window.removeEventListener('new-post-created', handleNewPostCreated);
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -188,31 +115,21 @@ export default function Feed() {
   const handleTabClick = (tab) => {
     if (activeTab === tab) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      feedCache[tab] = { posts: [], nextCursor: null, hasMore: true, scrollY: 0 };
+      setNextCursor(null);
       loadFeed();
     } else {
-      saveCacheFromState();
-      mountedRef.current = false;
       setActiveTab(tab);
     }
   };
 
   const handleLoadNewQueuedPosts = () => {
-    setPosts((prev) => {
-      const merged = [...newPostsQueue, ...prev];
-      saveCache(activeTab, { posts: merged });
-      return merged;
-    });
+    setPosts((prev) => [...newPostsQueue, ...prev]);
     setNewPostsQueue([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePostDeleted = (id) => {
-    setPosts((prev) => {
-      const filtered = prev.filter((p) => p._id !== id);
-      saveCache(activeTab, { posts: filtered });
-      return filtered;
-    });
+    setPosts((prev) => prev.filter((p) => p._id !== id));
   };
 
   const handleTouchStart = (e) => {
@@ -236,7 +153,7 @@ export default function Feed() {
     startTouchY.current = 0;
     if (pulling) {
       if (pullProgress >= 80) {
-        feedCache[activeTab] = { posts: [], nextCursor: null, hasMore: true, scrollY: 0 };
+        setNextCursor(null);
         loadFeed();
       } else {
         setPulling(false);

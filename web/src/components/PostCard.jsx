@@ -13,6 +13,43 @@ import {
   IconClose
 } from './Icons.jsx';
 
+function MediaViewer({ src, type, onClose }) {
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="media-viewer-overlay" onClick={onClose}>
+      <button className="media-viewer-close" onClick={onClose}>
+        <IconClose />
+      </button>
+      {type === 'video' ? (
+        <video
+          src={src}
+          controls
+          autoPlay
+          playsInline
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <img
+          src={src}
+          alt="Media penuh"
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+    </div>
+  );
+}
+
 function formatRelativeTime(dateStr) {
   const now = new Date();
   const past = new Date(dateStr);
@@ -88,6 +125,7 @@ export default function PostCard({ post, onDeleted }) {
   const shareRef = useRef(null);
   const videoRef = useRef(null);
   const [videoMuted, setVideoMuted] = useState(true);
+  const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
 
   // Sync liked & bookmarked states
   const liked = user && likes.some((id) => String(id) === String(user.id || user._id));
@@ -321,26 +359,30 @@ export default function PostCard({ post, onDeleted }) {
 
             {/* Media Upload */}
             {originalPost.mediaUrl && (
-              <div 
-                className={`post-media ${originalPost.mediaType === 'video' ? 'video' : ''}`}
+              <div
+                className="post-media"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (originalPost.mediaType === 'video' && videoRef.current) {
-                    setVideoMuted(!videoMuted);
-                  }
+                  setMediaViewerOpen(true);
                 }}
               >
                 {originalPost.mediaType === 'video' ? (
                   <>
-                    <video 
+                    <video
                       ref={videoRef}
-                      src={originalPost.mediaUrl} 
-                      preload="metadata" 
+                      src={originalPost.mediaUrl}
+                      preload="metadata"
                       loop
                       muted={videoMuted}
                       playsInline
                     />
-                    <button className="post-media-volume-btn">
+                    <button
+                      className="post-media-volume-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVideoMuted(!videoMuted);
+                      }}
+                    >
                       {videoMuted ? '🔇' : '🔊'}
                     </button>
                   </>
@@ -515,6 +557,15 @@ export default function PostCard({ post, onDeleted }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Media Fullscreen Viewer */}
+      {mediaViewerOpen && originalPost.mediaUrl && (
+        <MediaViewer
+          src={originalPost.mediaUrl}
+          type={originalPost.mediaType}
+          onClose={() => setMediaViewerOpen(false)}
+        />
       )}
     </div>
   );
