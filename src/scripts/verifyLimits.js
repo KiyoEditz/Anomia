@@ -10,6 +10,7 @@ const postCooldown = require('../middleware/postCooldown');
 const dailyPostLimit = require('../middleware/dailyPostLimit');
 const contentDedup = require('../middleware/contentDedup');
 const { incrementPostCount } = require('../services/postLimitService');
+const { DAILY_LIMIT, WARNING_THRESHOLD } = require('../config/postLimits');
 
 async function runTests() {
   await connectDB();
@@ -99,12 +100,12 @@ async function runTests() {
   await PostLimit.deleteMany({ userId: user._id });
   await Notification.deleteMany({ recipientId: user._id });
 
-  // Simulate warning at 30 posts
-  console.log('Simulating incrementing posts to 30...');
+  // Simulate warning at WARNING_THRESHOLD posts
+  console.log(`Simulating incrementing posts to ${WARNING_THRESHOLD}...`);
   let currentRecord = await PostLimit.create({
     userId: user._id,
     date: today,
-    postCount: 29,
+    postCount: WARNING_THRESHOLD - 1,
     lastPostAt: new Date(Date.now() - 60000) // avoid cooldown
   });
 
@@ -112,15 +113,15 @@ async function runTests() {
 
   let updatedRecord = await PostLimit.findOne({ userId: user._id, date: today });
   let warnings = await Notification.find({ recipientId: user._id, type: 'system' });
-  if (updatedRecord.postCount === 30 && updatedRecord.warningIssued && warnings.length === 1) {
+  if (updatedRecord.postCount === WARNING_THRESHOLD && updatedRecord.warningIssued && warnings.length === 1) {
     console.log('✅ Daily Warning passed: warningIssued set to true and system notification sent.');
   } else {
     console.error('❌ Daily Warning failed. Count:', updatedRecord.postCount, 'warningIssued:', updatedRecord.warningIssued, 'Notifications count:', warnings.length);
   }
 
-  // Simulate limitReached at 50 posts
-  console.log('Simulating incrementing posts to 50...');
-  updatedRecord.postCount = 49;
+  // Simulate limitReached at DAILY_LIMIT posts
+  console.log(`Simulating incrementing posts to ${DAILY_LIMIT}...`);
+  updatedRecord.postCount = DAILY_LIMIT - 1;
   updatedRecord.lastPostAt = new Date(Date.now() - 60000);
   await updatedRecord.save();
 
@@ -128,19 +129,19 @@ async function runTests() {
 
   updatedRecord = await PostLimit.findOne({ userId: user._id, date: today });
   let blocks = await Notification.find({ recipientId: user._id, type: 'system', message: /mencapai batas/ });
-  if (updatedRecord.postCount === 50 && updatedRecord.limitReached && blocks.length === 1) {
+  if (updatedRecord.postCount === DAILY_LIMIT && updatedRecord.limitReached && blocks.length === 1) {
     console.log('✅ Daily Limit Block passed: limitReached set to true and block notification sent.');
   } else {
     console.error('❌ Daily Limit Block failed. Count:', updatedRecord.postCount, 'limitReached:', updatedRecord.limitReached, 'Blocks count:', blocks.length);
   }
 
-  // Test dailyPostLimit middleware blocking on 50 posts
+  // Test dailyPostLimit middleware blocking on DAILY_LIMIT posts
   const res3 = createRes();
   nextCalled = false;
   await dailyPostLimit(req, res3, () => { nextCalled = true; });
 
   if (res3.statusCode === 429 && res3.body.message.includes('mencapai batas')) {
-    console.log('✅ dailyPostLimit middleware passed: Rejected post 51+ with 429.');
+    console.log(`✅ dailyPostLimit middleware passed: Rejected post ${DAILY_LIMIT + 1}+ with 429.`);
   } else {
     console.error('❌ dailyPostLimit middleware failed. Response:', res3.body, 'Code:', res3.statusCode);
   }

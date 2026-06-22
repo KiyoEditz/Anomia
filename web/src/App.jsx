@@ -10,6 +10,7 @@ import TagPage from './pages/TagPage.jsx';
 import Explore from './pages/Explore.jsx';
 import Notifications from './pages/Notifications.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
+import AdminBlockedLinks from './pages/AdminBlockedLinks.jsx';
 import { ComposerModal } from './components/Composer.jsx';
 import {
   IconHome,
@@ -67,7 +68,7 @@ export default function App() {
   }, [user]);
 
   // Check if we are on a detail/sub-page to show back button
-  const isSubPage = !['/', '/explore', '/notifications', '/admin'].includes(location.pathname);
+  const isSubPage = !['/', '/explore', '/notifications', '/admin', '/admin/blocked-links'].includes(location.pathname);
 
   // Helper to open composer (requires login)
   const handleOpenComposer = () => {
@@ -137,6 +138,13 @@ export default function App() {
                 </Link>
               )}
 
+              {(user.role === 'dev' || user.role === 'mod') && (
+                <Link to="/admin/blocked-links" className={`sidebar-link ${location.pathname === '/admin/blocked-links' ? 'active' : ''}`}>
+                  <IconShield />
+                  <span>Link Blocklist</span>
+                </Link>
+              )}
+
               <button className="sidebar-create-btn" onClick={handleOpenComposer}>
                 <span>Buat Post</span>
               </button>
@@ -171,6 +179,7 @@ export default function App() {
             <Route path="/tag/:slug" element={<TagPage />} />
             <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
             <Route path="/admin" element={<RequireAuth><AdminPanel /></RequireAuth>} />
+            <Route path="/admin/blocked-links" element={<RequireAuth><AdminBlockedLinks /></RequireAuth>} />
             <Route path="*" element={<div className="center">404 - Halaman Tidak Ditemukan</div>} />
           </Routes>
         </main>

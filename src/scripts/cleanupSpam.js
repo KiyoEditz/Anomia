@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 const Post = require('../models/Post');
 const PostLimit = require('../models/PostLimit');
+const { DAILY_LIMIT } = require('../config/postLimits');
 
 async function runCleanup() {
   await connectDB();
@@ -11,14 +12,14 @@ async function runCleanup() {
   const todayStr = new Date().toISOString().split('T')[0];
   const startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
 
-  // Step 1: Identify users with > 50 posts today
+  // Step 1: Identify users with > DAILY_LIMIT posts today
   const heavyPosters = await Post.aggregate([
     { $match: { createdAt: { $gte: startOfDay } } },
     { $group: { _id: "$author", count: { $sum: 1 } } },
-    { $match: { count: { $gt: 50 } } },
+    { $match: { count: { $gt: DAILY_LIMIT } } },
     { $sort: { count: -1 } }
   ]);
-  console.log(`Found ${heavyPosters.length} users with > 50 posts today:`, heavyPosters);
+  console.log(`Found ${heavyPosters.length} users with > ${DAILY_LIMIT} posts today:`, heavyPosters);
 
   // Step 3: Remove duplicate content (posts with identical content from the same author)
   const duplicates = await Post.aggregate([

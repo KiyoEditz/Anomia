@@ -27,7 +27,7 @@ const dailyPostLimit = async (req, res, next) => {
     // Cek apakah sudah mencapai limit harian
     if (record.limitReached || record.postCount >= DAILY_LIMIT) {
       return res.status(429).json({
-        message: 'Kamu sudah mencapai batas 50 postingan hari ini. Coba lagi besok.',
+        message: `Kamu sudah mencapai batas ${DAILY_LIMIT} postingan hari ini. Coba lagi besok.`,
         postsToday: record.postCount,
         limit: DAILY_LIMIT
       });

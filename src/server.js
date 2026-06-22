@@ -12,6 +12,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const adminRoutes = require('./routes/admin.routes');
 const feedRoutes = require('./routes/feed.routes');
+const blockedLinksRoutes = require('./routes/blockedLinks.routes');
 const { ALLOWED_ORIGINS } = require('./config/cors');
 const blockSensitiveFiles = require('./middleware/blockSensitiveFiles');
 const errorHandler = require('./middleware/errorHandler');
@@ -59,6 +60,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/blocked-links', blockedLinksRoutes);
 app.use('/api/feed', feedRoutes);
 
 app.use(errorHandler);

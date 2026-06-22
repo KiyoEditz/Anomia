@@ -8,6 +8,7 @@ const { postEndpointLimiter } = require('../middleware/ipRateLimiter');
 const postCooldown = require('../middleware/postCooldown');
 const dailyPostLimit = require('../middleware/dailyPostLimit');
 const contentDedup = require('../middleware/contentDedup');
+const linkBlocklistCheck = require('../middleware/linkBlocklistCheck');
 
 const requireRole = require('../middleware/requireRole');
 
@@ -19,6 +20,7 @@ router.post(
   dailyPostLimit,
   uploadSingle('file'),
   contentDedup,
+  linkBlocklistCheck,
   ctrl.create
 );
 router.get('/', ctrl.list);
