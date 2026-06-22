@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
+import TurnstileWidget from '../components/TurnstileWidget.jsx';
 
 export default function Register() {
   const { register } = useAuth();
@@ -10,16 +11,21 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const [honeypot, setHoneypot] = useState('');
 
   async function submit(e) {
     e.preventDefault();
     setErr('');
     setBusy(true);
     try {
-      await register(username, password, displayName || username);
+      await register(username, password, displayName || username, {
+        turnstileToken,
+        _hp: honeypot,
+      });
       navigate('/');
     } catch (e) {
-      setErr(e.response?.data?.error || 'Gagal mendaftar');
+      setErr(e.response?.data?.error || e.response?.data?.message || 'Gagal mendaftar');
     } finally {
       setBusy(false);
     }
@@ -40,6 +46,25 @@ export default function Register() {
         <label>Password (minimal 6 karakter)</label>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
+      <input
+        type="text"
+        name="website"
+        value={honeypot}
+        onChange={(e) => setHoneypot(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+        }}
+      />
+      <TurnstileWidget
+        onSuccess={(token) => setTurnstileToken(token)}
+        onError={() => setTurnstileToken(null)}
+      />
       <button type="submit" disabled={busy}>{busy ? '...' : 'Daftar'}</button>
       {err && <div className="error">{err}</div>}
       <p className="muted" style={{ marginTop: 16 }}>

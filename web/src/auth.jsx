@@ -67,14 +67,14 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(username, password) {
-    const r = await api.post('/auth/login', { username, password });
+  async function login(username, password, extraFields = {}) {
+    const r = await api.post('/auth/login', { username, password, ...extraFields });
     localStorage.setItem('anomia_token', r.data.token);
     setUser(r.data.user);
   }
 
-  async function register(username, password, displayName) {
-    const r = await api.post('/auth/register', { username, password, displayName });
+  async function register(username, password, displayName, extraFields = {}) {
+    const r = await api.post('/auth/register', { username, password, displayName, ...extraFields });
     localStorage.setItem('anomia_token', r.data.token);
     setUser(r.data.user);
   }

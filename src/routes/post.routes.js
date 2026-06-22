@@ -9,6 +9,8 @@ const postCooldown = require('../middleware/postCooldown');
 const dailyPostLimit = require('../middleware/dailyPostLimit');
 const contentDedup = require('../middleware/contentDedup');
 const linkBlocklistCheck = require('../middleware/linkBlocklistCheck');
+const requestFingerprint = require('../middleware/requestFingerprint');
+const honeypotCheck = require('../middleware/honeypotCheck');
 
 const requireRole = require('../middleware/requireRole');
 
@@ -16,6 +18,8 @@ router.post(
   '/',
   postEndpointLimiter,
   authRequired,
+  requestFingerprint({ blockBots: true }),
+  honeypotCheck,
   postCooldown,
   dailyPostLimit,
   uploadSingle('file'),

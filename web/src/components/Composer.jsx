@@ -78,7 +78,8 @@ export function ComposerModal({ isOpen, onClose, preselectedFile = null }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
   const [err, setErr] = useState('');
-  
+  const [honeypot, setHoneypot] = useState('');
+
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -170,6 +171,7 @@ export function ComposerModal({ isOpen, onClose, preselectedFile = null }) {
         fd.append('content', content);
         fd.append('tags', JSON.stringify(tags));
         fd.append('file', file);
+        fd.append('_hp', honeypot);
         
         // Make the API post request in parallel with progress bar
         const [apiRes] = await Promise.all([
@@ -179,7 +181,7 @@ export function ComposerModal({ isOpen, onClose, preselectedFile = null }) {
         res = apiRes;
       } else {
         const [apiRes] = await Promise.all([
-          api.post('/posts', { content, tags }),
+          api.post('/posts', { content, tags, _hp: honeypot }),
           progressPromise
         ]);
         res = apiRes;
@@ -330,6 +332,21 @@ export function ComposerModal({ isOpen, onClose, preselectedFile = null }) {
 
       {/* Footer toolbar */}
       <div className="modal-footer">
+        <input
+          type="text"
+          name="website"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            width: '1px',
+            height: '1px',
+            opacity: 0,
+          }}
+        />
         <div className="modal-footer-actions">
           <label className="modal-footer-btn" title="Ambil Foto/Video" style={{ cursor: busy ? 'not-allowed' : 'pointer' }}>
             <IconCamera size={22} />
